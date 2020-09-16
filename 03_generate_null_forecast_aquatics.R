@@ -109,7 +109,6 @@ model_output <- m %>%
 
 forecast_saved <- model_output %>%
   filter(time > start_forecast) %>%
-  mutate(forecast_issue_time = as_date(Sys.time())) %>%
   mutate(data_assimilation = 0) %>%
   mutate(forecast_iteration_id = start_forecast) %>%
   mutate(forecast_project_id = "EFInull")
