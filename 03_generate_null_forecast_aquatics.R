@@ -4,12 +4,19 @@ library(rjags)
 library(tidybayes)
 library(modelr)
 
-aquatic_targets <- read_csv("aquatic-oxygen-temperature.csv.gz", guess_max = 10000)
+set.seed(329)
+
+download.file("https://data.ecoforecast.org/targets/aquatics/aquatic-oxygen-temperature-targets.csv.gz",
+              "aquatic-oxygen-temperature-targets.csv.gz")
+
+aquatic_targets <- read_csv("aquatic-oxygen-temperature-targets.csv.gz", guess_max = 10000)
 oxygen <- aquatic_targets %>%
   filter(siteID == "BARC",
          time > as_date("2020-01-01"),
          hour(time) == 12) %>%
   select(time, siteID, dissolved_oxygen, dissolved_oxygen_sd)
+
+oxygen_sd <- mean(aquatic_targets$dissolved_oxygen_sd, na.rm = TRUE)
 
 
 #max_time <- max(oxygen$time) - months(1) +  days(1)
@@ -55,20 +62,26 @@ y_gaps <- y[!is.na(y)]
 #keep indexes to reference the gappy time series
 y_index <- y_index[!is.na(y)]
 
+init_x <- approx(x = time[!is.na(y)], y = y_gaps, xout = time, rule = 2)$y
+
 data <- list(y = y_gaps,
              y_index = y_index,
              nobs = length(y_index),
              n = length(y),
              x_ic = 8.620833,
              tau_ic = 51,
-             tau_obs = 1/(0.17^2),
+             tau_obs = 1/(oxygen_sd^2),
              lower_add=0.0001,
              upper_add=1000)
 
 nchain = 3
+chain_seeds <- c(200,800,1400)
 init <- list()
 for(i in 1:nchain){
-  init[[i]] <- list(sd_add=sd(diff(y_gaps)))
+  init[[i]] <- list(sd_add=sd(diff(y_gaps)),
+                    .RNG.name = "base::Wichmann-Hill",
+                    .RNG.seed = chain_seeds[i],
+                    x = init_x)
 }
 
 j.model   <- jags.model (file = textConnection(RandomWalk),
@@ -90,7 +103,8 @@ model_output <- m %>%
          ensemble = .iteration) %>%
   mutate(time = full_time$time[day]) %>%
   ungroup() %>%
-  select(time, oxygen, ensemble)
+  select(time, oxygen, ensemble) %>%
+  mutate(oxygen_w_obs_error = rnorm(n(), mean = oxygen, sd = oxygen_sd))
 
 forecast_saved <- model_output %>%
   filter(time > start_forecast) %>%
@@ -99,14 +113,14 @@ forecast_saved <- model_output %>%
   mutate(forecast_iteration_id = start_forecast) %>%
   mutate(forecast_project_id = "EFInull")
 
-forecast_file_name <- paste0("aquatics-EFInull-",as_date(start_forecast),".csv.gz")
+forecast_file_name <- paste0("aquatics-EFInull-",as_date(start_forecast),"1.csv")
 write_csv(forecast_saved, forecast_file_name)
 
 ## Publish the forecast automatically. (EFI-only)
 
-source("R/publish.R")
+source("../NEON-community-forecast/R/publish.R")
 publish(code = "03_generate_null_forecast_aquatics.R",
-        data_in = "beetle-targets.csv.gz",
+        data_in = "aquatic-oxygen-temperature-targets.csv.gz",
         data_out = forecast_file_name,
         prefix = "aquatics/",
         bucket = "forecasts")

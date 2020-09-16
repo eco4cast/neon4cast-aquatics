@@ -2,62 +2,66 @@
 ## Process the raw data into the target variable product
 library(neonstore)
 library(tidyverse)
+library(lubridate)
 
+Sys.setenv("NEONSTORE_HOME" = "/efi_neon_challenge/neonstore")
+
+neon_download("DP1.20264.001", site =  focal_sites, type="basic") #Water Temperature
 
 ## Load data from raw files
 focal_sites <- c("BARC","FLNT")
-oxy <- neon_read(table = "waq_instantaneous", site = focal_sites)
+oxy <- neonstore::neon_read(table = "waq_instantaneous", site = focal_sites)
 temp <- neon_read("TSD_30_min", site = focal_sites)
 
 
 #### Generate oxygen table #############
 
 oxy <- oxy %>%
-  select(siteID, startDateTime, sensorDepth, dissolvedOxygen,
-         dissolvedOxygenExpUncert,dissolvedOxygenFinalQF) %>%
-  filter(dissolvedOxygenFinalQF == 0,
-         sensorDepth > 0) %>%
-  mutate(startDateTime = as_datetime(startDateTime))
+  dplyr::select(siteID, startDateTime, sensorDepth, dissolvedOxygen,
+                dissolvedOxygenExpUncert,dissolvedOxygenFinalQF) %>%
+  dplyr::filter(dissolvedOxygenFinalQF == 0,
+                sensorDepth > 0) %>%
+  dplyr::mutate(startDateTime = as_datetime(startDateTime))
 
 oxy <- oxy %>%
-  mutate(date = as_date(startDateTime),
-         hour = hour(startDateTime)) %>%
-  group_by(siteID, date, hour) %>%
-  summarize(sensorDepth = mean(sensorDepth, na.rm = TRUE),
-            dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE),
-            dissolvedOxygenExpUncert = mean(dissolvedOxygenExpUncert, na.rm = TRUE), .groups = "drop") %>%
-  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                       day = day(date), hour = hour,
-                                       min = 0, tz ="UTC")) %>%
-  select(siteID, startDateTime, sensorDepth, dissolvedOxygen, dissolvedOxygenExpUncert)
+  dplyr::mutate(date = as_date(startDateTime),
+                hour = hour(startDateTime)) %>%
+  dplyr::group_by(siteID, date, hour) %>%
+  dplyr::summarize(sensorDepth = mean(sensorDepth, na.rm = TRUE),
+                   dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE),
+                   dissolvedOxygenExpUncert = mean(dissolvedOxygenExpUncert, na.rm = TRUE), .groups = "drop") %>%
+  dplyr::mutate(startDateTime = make_datetime(year = year(date), month = month(date),
+                                              day = day(date), hour = hour,
+                                              min = 0, tz ="UTC")) %>%
+  dplyr::select(siteID, startDateTime, sensorDepth, dissolvedOxygen, dissolvedOxygenExpUncert)
 
 ### Generate surface (< 2 m) temperature #############
 
 temp <- temp %>%
-  select(startDateTime, siteID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert)
-  mutate(date = as_date(startDateTime),
-         hour = hour(startDateTime)) %>%
-  group_by(date, siteID, hour,thermistorDepth) %>%
-  summarize(tsdWaterTempMean = mean(tsdWaterTempMean, na.rm = TRUE),
-            tsdWaterTempExpUncert = mean(tsdWaterTempExpUncert, na.rm = TRUE), .groups = "drop") %>%
-  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                       day = day(date), hour = hour, min = 0,
-                                       tz ="UTC")) %>%
-  select(startDateTime, siteID, tsdWaterTempMean,thermistorDepth,tsdWaterTempExpUncert) %>%
-    filter(thermistorDepth <  2.00) %>%
-    group_by(startDateTime, siteID) %>%
-    summarise(tsdWaterTempMean = mean(tsdWaterTempMean, na.rm = TRUE),
-              tsdWaterTempExpUncert = mean(tsdWaterTempExpUncert), .groups = "drop")
+  dplyr::select(startDateTime, siteID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert) %>%
+  dplyr::mutate(date = as_date(startDateTime),
+                hour = hour(startDateTime)) %>%
+  dplyr::group_by(date, siteID, hour,thermistorDepth) %>%
+  dplyr::summarize(tsdWaterTempMean = mean(tsdWaterTempMean, na.rm = TRUE),
+                   tsdWaterTempExpUncert = mean(tsdWaterTempExpUncert, na.rm = TRUE), .groups = "drop") %>%
+  dplyr::mutate(startDateTime = make_datetime(year = year(date), month = month(date),
+                                              day = day(date), hour = hour, min = 0,
+                                              tz ="UTC")) %>%
+  dplyr::select(startDateTime, siteID, tsdWaterTempMean,thermistorDepth,tsdWaterTempExpUncert) %>%
+  dplyr::filter(thermistorDepth <  2.00) %>%
+  dplyr::group_by(startDateTime, siteID) %>%
+  dplyr::summarise(tsdWaterTempMean = mean(tsdWaterTempMean, na.rm = TRUE),
+                   tsdWaterTempExpUncert = mean(tsdWaterTempExpUncert), .groups = "drop")
 
 ### Combine oxygen and temperature together into a single table
 
-aquatic_targets <- full_join(temp_surface, oxy, by = c("startDateTime", "siteID")) %>%
-  rename(time = startDateTime,
-         water_temperature = tsdWaterTempMean,
-         water_temperature_sd = tsdWaterTempExpUncert,
-         dissolved_oxygen = dissolvedOxygen,
-         dissolved_oxygen_sd = dissolvedOxygenExpUncert) %>%
-  select(time, siteID, water_temperature, water_temperature_sd, dissolved_oxygen, dissolved_oxygen_sd)
+aquatic_targets <- full_join(temp, oxy, by = c("startDateTime", "siteID")) %>%
+  dplyr::rename(time = startDateTime,
+                water_temperature = tsdWaterTempMean,
+                water_temperature_sd = tsdWaterTempExpUncert,
+                dissolved_oxygen = dissolvedOxygen,
+                dissolved_oxygen_sd = dissolvedOxygenExpUncert) %>%
+  dplyr::select(time, siteID, water_temperature, water_temperature_sd, dissolved_oxygen, dissolved_oxygen_sd)
 
 ### Create a time vector without time gaps and join with the aquatics table to
 ### continusoul time vector
@@ -72,11 +76,11 @@ aquatic_targets <- left_join(time, aquatic_targets, by = "time")%>%
 
 ### Write out the targets
 
-write_csv(aquatic_targets, "aquatic-oxygen-temperature.csv.gz")
+write_csv(aquatic_targets, "/efi_neon_challenge/targets/aquatics/aquatic-oxygen-temperature-targets.csv.gz")
 
 
 ## Publish the targets to EFI.  Assumes aws.s3 env vars are configured.
-source("R/publish.R")
+source("../NEON-community-forecast/R/publish.R")
 publish(code = c("02_generate_targets_aquatics.R"),
         data_out = "aquatic-oxygen-temperature.csv.gz",
         prefix = "aquatics/",
