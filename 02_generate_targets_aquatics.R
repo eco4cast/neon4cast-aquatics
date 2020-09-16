@@ -4,10 +4,6 @@ library(neonstore)
 library(tidyverse)
 library(lubridate)
 
-Sys.setenv("NEONSTORE_HOME" = "/efi_neon_challenge/neonstore")
-
-neon_download("DP1.20264.001", site =  focal_sites, type="basic") #Water Temperature
-
 ## Load data from raw files
 focal_sites <- c("BARC","FLNT")
 oxy <- neonstore::neon_read(table = "waq_instantaneous", site = focal_sites)
