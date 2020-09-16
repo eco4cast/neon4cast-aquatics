@@ -6,10 +6,10 @@ library(modelr)
 
 set.seed(329)
 
-download.file("https://data.ecoforecast.org/targets/aquatics/aquatic-oxygen-temperature-targets.csv.gz",
+download.file("https://data.ecoforecast.org/targets/aquatics/aquatic-oxygen-targets.csv.gz",
               "aquatic-oxygen-temperature-targets.csv.gz")
 
-aquatic_targets <- read_csv("aquatic-oxygen-temperature-targets.csv.gz", guess_max = 10000)
+aquatic_targets <- read_csv("aquatic-oxygen-targets.csv.gz", guess_max = 10000)
 oxygen <- aquatic_targets %>%
   filter(siteID == "BARC",
          time > as_date("2020-01-01"),
@@ -35,20 +35,21 @@ oxygen <- left_join(full_time, oxygen)
 RandomWalk = "
 model{
 
-  #### Data Model
-  for(t in 1:nobs){
-    y[t] ~ dnorm(x[y_index[t]],tau_obs)
-  }
+  #### Priors
+  x[1] ~ dnorm(x_ic,tau_ic)
+  tau_add <- 1 / pow(sd_add,2)
+  sd_add ~ dunif(lower_add,upper_add)
 
   #### Process Model
   for(t in 2:n){
     x[t]~dnorm(x[t-1],tau_add)
   }
 
-  #### Priors
-  x[1] ~ dnorm(x_ic,tau_ic)
-  tau_add <- 1 / pow(sd_add,2)
-  sd_add ~ dunif(lower_add,upper_add)
+  #### Data Model
+  for(t in 1:nobs){
+    y[t] ~ dnorm(x[y_index[t]],tau_obs)
+  }
+
 }
 "
 
@@ -113,7 +114,7 @@ forecast_saved <- model_output %>%
   mutate(forecast_iteration_id = start_forecast) %>%
   mutate(forecast_project_id = "EFInull")
 
-forecast_file_name <- paste0("aquatics-EFInull-",as_date(start_forecast),"1.csv")
+forecast_file_name <- paste0("aquatics-oxygen-EFInull-",as_date(start_forecast),".csv")
 write_csv(forecast_saved, forecast_file_name)
 
 ## Publish the forecast automatically. (EFI-only)
