@@ -113,14 +113,14 @@ forecast_saved <- model_output %>%
   mutate(forecast_iteration_id = start_forecast) %>%
   mutate(forecast_project_id = "EFInull")
 
-forecast_file_name <- paste0("aquatics-oxygen-EFInull-",as_date(start_forecast),".csv")
+forecast_file_name <- paste0("aquatics-oxygen-EFInull-",as_date(start_forecast),".csv.gz")
 write_csv(forecast_saved, forecast_file_name)
 
 ## Publish the forecast automatically. (EFI-only)
 
 source("../NEON-community-forecast/R/publish.R")
 publish(code = "03_generate_null_forecast_aquatics.R",
-        data_in = "aquatic-oxygen-temperature-targets.csv.gz",
+        data_in = "aquatic-oxygen-targets.csv.gz",
         data_out = forecast_file_name,
         prefix = "aquatics/",
         bucket = "forecasts")
