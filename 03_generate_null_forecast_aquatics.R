@@ -7,7 +7,7 @@ library(modelr)
 set.seed(329)
 
 download.file("https://data.ecoforecast.org/targets/aquatics/aquatic-oxygen-targets.csv.gz",
-              "aquatic-oxygen-temperature-targets.csv.gz")
+              "aquatic-oxygen-targets.csv.gz")
 
 aquatic_targets <- read_csv("aquatic-oxygen-targets.csv.gz", guess_max = 10000)
 oxygen <- aquatic_targets %>%
