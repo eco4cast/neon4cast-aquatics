@@ -1,3 +1,5 @@
+renv::restore()
+
 library(tidyverse)
 library(lubridate)
 library(rjags)
