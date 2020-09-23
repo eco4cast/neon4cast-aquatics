@@ -40,9 +40,11 @@ model{
   tau_add <- 1 / pow(sd_add,2)
   sd_add ~ dunif(lower_add,upper_add)
 
+
   #### Process Model
   for(t in 2:n){
     x[t]~dnorm(x[t-1],tau_add)
+    x_obs[t] ~ dnorm(x[t],tau_obs)
   }
 
   #### Data Model
@@ -93,19 +95,18 @@ j.model   <- jags.model (file = textConnection(RandomWalk),
 jags.out   <- coda.samples (model = j.model,variable.names = "sd_add", n.iter = 10000)
 
 m   <- coda.samples (model = j.model,
-                     variable.names = c("x","sd_add"),
+                     variable.names = c("x","sd_add", "x_obs"),
                      n.iter = 10000,
                      thin = 5)
 
 model_output <- m %>%
-  spread_draws(x[day]) %>%
+  spread_draws(x_obs[day]) %>%
   filter(.chain == 1) %>%
-  rename(oxygen = x,
+  rename(oxygen = x_obs,
          ensemble = .iteration) %>%
   mutate(time = full_time$time[day]) %>%
   ungroup() %>%
-  select(time, oxygen, ensemble) %>%
-  mutate(oxygen_w_obs_error = rnorm(n(), mean = oxygen, sd = oxygen_sd))
+  select(time, oxygen, ensemble)
 
 forecast_saved <- model_output %>%
   filter(time > start_forecast) %>%

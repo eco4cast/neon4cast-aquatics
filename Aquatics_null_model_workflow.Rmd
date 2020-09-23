@@ -193,17 +193,19 @@ model{
   x[1] ~ dnorm(x_ic,tau_ic)
   tau_add <- 1 / pow(sd_add,2)
   sd_add ~ dunif(lower_add,upper_add)
-  
+
+
   #### Process Model
   for(t in 2:n){
     x[t]~dnorm(x[t-1],tau_add)
+    x_obs[t] ~ dnorm(x[t],tau_obs)
   }
-  
+
   #### Data Model
   for(t in 1:nobs){
     y[t] ~ dnorm(x[y_index[t]],tau_obs)
   }
-  
+
 }
 "
 ```
@@ -255,7 +257,7 @@ Sample jags model
 jags.out   <- coda.samples (model = j.model,variable.names = "sd_add", n.iter = 10000)
 
 m   <- coda.samples (model = j.model,
-                     variable.names = c("x","sd_add"),
+                     variable.names = c("x","sd_add","x_obs"),
                      n.iter = 10000,
                      thin = 5)
 ```
@@ -264,21 +266,13 @@ Use the package tidybayes to clean up the JAGS output
 
 ```{r}
 model_output <- m %>%
-  spread_draws(x[day]) %>%
+  spread_draws(x_obs[day]) %>%
   filter(.chain == 1) %>%
-  rename(oxygen = x,
+  rename(oxygen = x_obs,
          ensemble = .iteration) %>%
   mutate(time = full_time$time[day]) %>%
   ungroup() %>%
-  select(time, oxygen, ensemble) %>%
-  mutate(oxygen_w_obs_error = rnorm(n(), mean = oxygen, sd = oxygen_sd))
-```
-
-Add observation error to the forecast
-
-```{r}
-model_output <- model_output %>% 
-  mutate(oxygen_w_obs_error = rnorm(n(), mean = oxygen, sd = oxygen_sd))
+  select(time, oxygen, ensemble)
 ```
 
 Does the output look reasonable?
@@ -290,14 +284,11 @@ obs <- tibble(time = full_time$time,
 model_output %>% 
   group_by(time) %>% 
   summarise(mean = mean(oxygen),
-            upper_latent = quantile(oxygen, 0.975),
-            lower_latent = quantile(oxygen, 0.025),
-            upper_obs = quantile(oxygen_w_obs_error, 0.975),
-            lower_obs = quantile(oxygen_w_obs_error, 0.025), .groups = "drop") %>% 
+            upper = quantile(oxygen, 0.975),
+            lower = quantile(oxygen, 0.025),.groups = "drop") %>% 
   ggplot(aes(x = time, y = mean)) +
   geom_line() +
-  geom_ribbon(aes(ymin = lower_latent, ymax = upper_latent), alpha = 0.2, color = "lightblue", fill = "lightblue") +
-  geom_ribbon(aes(ymin = lower_obs, ymax = upper_obs), alpha = 0.2, color = "pink", fill = "pink") +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, color = "lightblue", fill = "lightblue") +
   geom_point(data = obs, aes(x = time, y = obs), color = "red") +
   labs(x = "Date", y = "Oxygen concentration (mg/L)")
 ```
