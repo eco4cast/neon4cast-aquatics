@@ -1,5 +1,6 @@
+print(paste0("Running Creating Aquatics Targets at ", Sys.time()))
+
 renv::restore()
-print("Creating Aquatics Targets")
 
 ## 02_generate_targets_aquatics
 ## Process the raw data into the target variable product
@@ -11,6 +12,8 @@ library(contentid)
 ## Load data from raw files
 focal_sites <- c("BARC","FLNT")
 oxy <- neonstore::neon_read(table = "waq_instantaneous", site = focal_sites)
+print(neonstore::neon_dir())
+print(getwd())
 temp <- neonstore::neon_read("TSD_30_min", site = focal_sites)
 
 
