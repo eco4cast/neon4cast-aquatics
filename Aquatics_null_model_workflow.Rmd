@@ -473,8 +473,8 @@ Read in forecast and convert to the matrix format that is needed by the crps_sam
 forecast <- read_csv(forecast_file_name) 
 
 dat <- forecast %>% 
-  select(time, oxygen_w_obs_error, ensemble) %>% 
-  pivot_wider(names_from = ensemble, values_from = oxygen_w_obs_error) %>% 
+  select(time, oxygen, ensemble) %>% 
+  pivot_wider(names_from = ensemble, values_from = oxygen) %>% 
   select(-time)
 
 dat <- as.matrix(dat)
