@@ -1,13 +1,17 @@
+renv::restore()
+print("Creating Aquatics Targets")
+
 ## 02_generate_targets_aquatics
 ## Process the raw data into the target variable product
 library(neonstore)
 library(tidyverse)
 library(lubridate)
+library(contentid)
 
 ## Load data from raw files
 focal_sites <- c("BARC","FLNT")
 oxy <- neonstore::neon_read(table = "waq_instantaneous", site = focal_sites)
-temp <- neon_read("TSD_30_min", site = focal_sites)
+temp <- neonstore::neon_read("TSD_30_min", site = focal_sites)
 
 
 #### Generate oxygen table #############
