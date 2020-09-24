@@ -92,7 +92,7 @@ write_csv(temp_targets, "aquatic-temperature-targets.csv.gz")
 write_csv(oxygen_targets, "aquatic-oxygen-targets.csv.gz")
 
 ## Publish the targets to EFI.  Assumes aws.s3 env vars are configured.
-source("../NEON-community-forecast/R/publish.R")
+source("R/publish.R")
 publish(code = c("02_generate_targets_aquatics.R"),
         data_out = c("aquatic-temperature-targets.csv.gz","aquatic-oxygen-targets.csv.gz"),
         prefix = "aquatics/",

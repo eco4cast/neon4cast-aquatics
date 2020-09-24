@@ -93,6 +93,13 @@
       "Repository": "RSPM",
       "Hash": "8845285b6151967fb0d95678b7eee11a"
     },
+    "V8": {
+      "Package": "V8",
+      "Version": "3.2.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "3c172c3eba3972c896b73361bfa323d0"
+    },
     "arrayhelpers": {
       "Package": "arrayhelpers",
       "Version": "1.1-0",
@@ -113,6 +120,20 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "50c838a310445e954bc13f26f26a6ecf"
+    },
+    "aws.s3": {
+      "Package": "aws.s3",
+      "Version": "0.3.21",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "a0b873f71741bba67e3bc128d8f09fe3"
+    },
+    "aws.signature": {
+      "Package": "aws.signature",
+      "Version": "0.6.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "0006bcef272aad12f78dd5a85fc7f4fc"
     },
     "backports": {
       "Package": "backports",
@@ -200,10 +221,10 @@
     },
     "contentid": {
       "Package": "contentid",
-      "Version": "0.0.4",
+      "Version": "0.0.7",
       "Source": "Repository",
       "Repository": "RSPM",
-      "Hash": "57a0f9fceb497db11c2c8e58c88856e5"
+      "Hash": "dcc105438126085dbea14119b4931ae6"
     },
     "cpp11": {
       "Package": "cpp11",
@@ -379,6 +400,13 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "6e58bd3d6b3dd82a944cd6f05ade228f"
+    },
+    "jsonld": {
+      "Package": "jsonld",
+      "Version": "2.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "173b7fe6d4c05b04aef7d350bc72ffeb"
     },
     "jsonlite": {
       "Package": "jsonlite",
@@ -559,6 +587,18 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "14dc9f7a3c91ebb14ec5bb9208a07061"
+    },
+    "prov": {
+      "Package": "prov",
+      "Version": "0.0.1",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "prov",
+      "RemoteUsername": "cboettig",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "e40061c8ef363a18fb18970ed1316f7d31768400",
+      "Hash": "42a89fabb55c8560bd9c351416960b6c"
     },
     "ps": {
       "Package": "ps",
@@ -762,6 +802,13 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "4a5081acfb7b81a572e4384a7aaf2af1"
+    },
+    "uuid": {
+      "Package": "uuid",
+      "Version": "0.1-4",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "e4169eb989a5d03ccb6b628cad1b1b50"
     },
     "vctrs": {
       "Package": "vctrs",
