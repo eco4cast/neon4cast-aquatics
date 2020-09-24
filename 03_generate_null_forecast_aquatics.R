@@ -8,6 +8,8 @@ library(modelr)
 
 set.seed(329)
 
+print(paste0("Generating aquatic null forecast ", Sys.time()))
+
 download.file("https://data.ecoforecast.org/targets/aquatics/aquatic-oxygen-targets.csv.gz",
               "aquatic-oxygen-targets.csv.gz")
 
@@ -116,14 +118,21 @@ forecast_saved <- model_output %>%
   mutate(forecast_iteration_id = start_forecast) %>%
   mutate(forecast_project_id = "EFInull")
 
+
 forecast_file_name <- paste0("aquatics-oxygen-EFInull-",as_date(start_forecast),".csv.gz")
+print(paste0("Writing forecast to ", forecast_file_name))
 write_csv(forecast_saved, forecast_file_name)
 
 ## Publish the forecast automatically. (EFI-only)
 
 source("../NEON-community-forecast/R/publish.R")
+print("Publishing forecast to bucket")
 publish(code = "03_generate_null_forecast_aquatics.R",
         data_in = "aquatic-oxygen-targets.csv.gz",
         data_out = forecast_file_name,
         prefix = "aquatics/",
         bucket = "forecasts")
+
+print(paste0("Finished aquatic null forecast ", Sys.time()))
+
+
