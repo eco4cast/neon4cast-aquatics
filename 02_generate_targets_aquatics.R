@@ -9,12 +9,15 @@ library(tidyverse)
 library(lubridate)
 library(contentid)
 
+neonstore::neon_store(table = "waq_instantaneous")
+neonstore::neon_store(table = "TSD_30_min")
+
 ## Load data from raw files
 focal_sites <- c("BARC","FLNT")
-oxy <- neonstore::neon_read(table = "waq_instantaneous", site = focal_sites)
+oxy <- neonstore::neon_table(table = "waq_instantaneous", site = focal_sites)
 print(neonstore::neon_dir())
 print(getwd())
-temp <- neonstore::neon_read("TSD_30_min", site = focal_sites)
+temp <- neonstore::neon_table("TSD_30_min", site = focal_sites)
 
 
 #### Generate oxygen table #############
