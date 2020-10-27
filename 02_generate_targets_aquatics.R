@@ -9,6 +9,8 @@ library(tidyverse)
 library(lubridate)
 library(contentid)
 
+print(paste0("Running Creating Aquatics Targets at ", Sys.time()))
+
 neonstore::neon_store(table = "waq_instantaneous")
 neonstore::neon_store(table = "TSD_30_min")
 
@@ -70,3 +72,5 @@ publish(code = "02_generate_targets_aquatics.R",
         data_out = "aquatics-targets.csv.gz",
         prefix = "aquatics/",
         bucket = "targets")
+
+print(paste0("Completed Aquatics Target at ", Sys.time()))
