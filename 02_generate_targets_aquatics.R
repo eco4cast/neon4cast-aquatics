@@ -14,10 +14,10 @@ neonstore::neon_store(table = "TSD_30_min")
 
 ## Load data from raw files
 focal_sites <- c("BARC","FLNT")
-oxy <- neonstore::neon_table(table = "waq_instantaneous", site = focal_sites)
+oxy <- neonstore::neon_read(table = "waq_instantaneous", site = focal_sites)
 print(neonstore::neon_dir())
 print(getwd())
-temp <- neonstore::neon_table("TSD_30_min", site = focal_sites)
+temp <- neonstore::neon_read("TSD_30_min", site = focal_sites)
 
 
 #### Generate oxygen table #############
@@ -28,75 +28,45 @@ oxy_cleaned <- oxy %>%
   dplyr::filter(dissolvedOxygenFinalQF == 0,
                 sensorDepth > 0) %>%
   dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
-  dplyr::mutate(date = as_date(startDateTime),
-                hour = hour(startDateTime)) %>%
-  dplyr::group_by(siteID, date, hour) %>%
-  dplyr::summarize(sensorDepth = mean(sensorDepth, na.rm = TRUE),
-                   dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE),
-                   dissolvedOxygenExpUncert = mean(dissolvedOxygenExpUncert, na.rm = TRUE),
+  dplyr::mutate(time = as_date(startDateTime)) %>% 
+  dplyr::group_by(siteID, time) %>%
+  dplyr::summarize(oxygen = mean(dissolvedOxygen, na.rm = TRUE),
+                   oxygen_sd = mean(dissolvedOxygenExpUncert, na.rm = TRUE),
                    sensorDepth = mean(sensorDepth, na.rm = TRUE), .groups = "drop") %>%
-  dplyr::mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour,
-                                              min = 0, tz ="UTC")) %>%
-  dplyr::select(siteID, startDateTime, sensorDepth, dissolvedOxygen, dissolvedOxygenExpUncert)
+  dplyr::select(siteID, time, sensorDepth, oxygen, oxygen_sd) %>% 
+  dplyr::rename(depth_oxygen = sensorDepth)
 
 ### Generate surface (< 2 m) temperature #############
 
 temp_cleaned <- temp %>%
-  dplyr::select(startDateTime, siteID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert) %>%
-  dplyr::mutate(date = as_date(startDateTime),
-                hour = hour(startDateTime)) %>%
-  dplyr::group_by(date, siteID, hour,thermistorDepth) %>%
-  dplyr::summarize(tsdWaterTempMean = mean(tsdWaterTempMean, na.rm = TRUE),
-                   tsdWaterTempExpUncert = mean(tsdWaterTempExpUncert, na.rm = TRUE), .groups = "drop") %>%
-  dplyr::mutate(startDateTime = make_datetime(year = year(date), month = month(date),
-                                              day = day(date), hour = hour, min = 0,
-                                              tz ="UTC")) %>%
-  dplyr::select(startDateTime, siteID, tsdWaterTempMean,thermistorDepth,tsdWaterTempExpUncert) %>%
-  dplyr::group_by(startDateTime, siteID, thermistorDepth) %>%
-  dplyr::summarise(tsdWaterTempMean = mean(tsdWaterTempMean, na.rm = TRUE),
-                   tsdWaterTempExpUncert = mean(tsdWaterTempExpUncert), .groups = "drop") %>%
-  dplyr::filter(thermistorDepth == min(thermistorDepth))
+  dplyr::select(startDateTime, siteID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert, tsdWaterTempFinalQF) %>%
+  dplyr::filter(thermistorDepth > 0.75 & thermistorDepth < 1.25 & tsdWaterTempFinalQF == 0) %>% 
+  dplyr::mutate(time = as_date(startDateTime)) %>%
+  dplyr::group_by(time, siteID, thermistorDepth) %>%
+  dplyr::summarize(thermistorDepth = mean(thermistorDepth, na.rm = TRUE),
+                   temperature = mean(tsdWaterTempMean, na.rm = TRUE),
+                   temperature_sd = mean(tsdWaterTempExpUncert, na.rm = TRUE), .groups = "drop") %>% 
+  dplyr::rename(depth_temperature = thermistorDepth)
 
-### Combine oxygen and temperature together into a single table
+targets <- full_join(oxy_cleaned, temp_cleaned, by = c("time","siteID")) %>% 
+  select(time, siteID, oxygen, temperature, oxygen_sd, temperature_sd, depth_oxygen, depth_temperature)
 
-temp_targets <- temp_cleaned %>%
-  rename(time = startDateTime,
-         water_temperature = tsdWaterTempMean,
-         water_temperature_sd = tsdWaterTempExpUncert,
-         depth = thermistorDepth)
+targets %>% 
+  filter(siteID == "BARC") %>% 
+  select(time, oxygen, temperature) %>% 
+  pivot_longer(-time, names_to = "variable", values_to = "value") %>% 
+  ggplot(aes(x = time, y = value)) +
+  geom_point() +
+  facet_wrap(~variable)
 
-oxygen_targets <- oxy_cleaned %>%
-  rename(time = startDateTime,
-         dissolved_oxygen = dissolvedOxygen,
-         dissolved_oxygen_sd = dissolvedOxygenExpUncert,
-         depth = sensorDepth)
-
-time <- tibble(time = seq(min(temp_targets$time),max(temp_targets$time), by = "1 hour"))
-
-### Create a time vector without time gaps and join with the aquatics table to
-### continusoul time vector
-
-temp_targets <- left_join(time, temp_targets, by = "time") %>%
-  select(time, siteID, water_temperature, water_temperature_sd, depth) %>%
-  mutate(water_temperature = ifelse(is.nan(water_temperature), NA, water_temperature),
-         water_temperature_sd = ifelse(is.nan(water_temperature_sd), NA, water_temperature_sd),
-         depth = ifelse(is.nan(depth), NA, depth))
-
-oxygen_targets <- left_join(time, oxygen_targets, by = "time") %>%
-  select(time, siteID, dissolved_oxygen, dissolved_oxygen_sd, depth) %>%
-  mutate(dissolved_oxygen = ifelse(is.nan(dissolved_oxygen), NA, dissolved_oxygen),
-         dissolved_oxygen_sd = ifelse(is.nan(dissolved_oxygen_sd), NA, dissolved_oxygen_sd),
-         depth = ifelse(is.nan(depth), NA, depth))
 
 ### Write out the targets
 
-write_csv(temp_targets, "aquatic-temperature-targets.csv.gz")
-write_csv(oxygen_targets, "aquatic-oxygen-targets.csv.gz")
+write_csv(targets, "aquatics-targets.csv.gz")
 
 ## Publish the targets to EFI.  Assumes aws.s3 env vars are configured.
-source("R/publish.R")
-publish(code = c("02_generate_targets_aquatics.R"),
-        data_out = c("aquatic-temperature-targets.csv.gz","aquatic-oxygen-targets.csv.gz"),
+source("../neon4cast-shared-utilities/publish.R")
+publish(code = "02_generate_targets_aquatics.R",
+        data_out = "aquatics-targets.csv.gz",
         prefix = "aquatics/",
         bucket = "targets")
