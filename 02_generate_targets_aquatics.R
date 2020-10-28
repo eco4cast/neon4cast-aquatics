@@ -20,10 +20,11 @@ neonstore::neon_store(table = "TSW_30min")
 
 ## Load data from raw files
 focal_sites <- c("BARC","POSE")
+message("neon_table(table = 'waq_instantaneous')")
 oxy <- neonstore::neon_table(table = "waq_instantaneous", site = focal_sites)
-message(neonstore::neon_dir())
-message(getwd())
+message("neon_table(table = 'TSD_30_min')")
 temp_bouy <- neonstore::neon_table("TSD_30_min", site = focal_sites)
+message("neon_table(table = 'TSW_30min')")
 temp_prt <- neonstore::neon_table("TSW_30min", site = focal_sites)
 
 #### Generate oxygen table #############
