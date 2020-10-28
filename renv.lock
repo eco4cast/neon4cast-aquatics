@@ -508,8 +508,8 @@
       "RemoteRepo": "neonstore",
       "RemoteUsername": "cboettig",
       "RemoteRef": "HEAD",
-      "RemoteSha": "a9fadf675b7bd642ca511f1b5735a5b87553a4bc",
-      "Hash": "bd4608267beb913cf9500df73ff0d140"
+      "RemoteSha": "888d9d19a49bf96432cb650c5a62288a85f9a4ba",
+      "Hash": "9980e034e057047bfe81807f4ed61040"
     },
     "nlme": {
       "Package": "nlme",
