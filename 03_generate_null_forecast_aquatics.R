@@ -11,8 +11,6 @@ library(modelr)
 set.seed(329)
 generate_plots <- TRUE
 
-
-
 download.file("https://data.ecoforecast.org/targets/aquatics/aquatics-targets.csv.gz",
               "aquatics-targets.csv.gz")
 

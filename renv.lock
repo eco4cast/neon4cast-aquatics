@@ -501,15 +501,15 @@
     },
     "neonstore": {
       "Package": "neonstore",
-      "Version": "0.3.2",
+      "Version": "0.3.3",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteRepo": "neonstore",
       "RemoteUsername": "cboettig",
       "RemoteRef": "HEAD",
-      "RemoteSha": "efd2aefb1928dce3f7e37940eab23408314c5b58",
-      "Hash": "f0bb99ea9189414e700103b136b2db3c"
+      "RemoteSha": "a9fadf675b7bd642ca511f1b5735a5b87553a4bc",
+      "Hash": "bd4608267beb913cf9500df73ff0d140"
     },
     "nlme": {
       "Package": "nlme",

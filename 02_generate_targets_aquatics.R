@@ -38,8 +38,8 @@ oxy_cleaned <- oxy %>%
   dplyr::group_by(siteID, time) %>%
   dplyr::summarize(oxygen = mean(dissolvedOxygen, na.rm = TRUE),
                    sensorDepth = mean(sensorDepth, na.rm = TRUE),
-                   oxygen_sd = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(48),
-                   count = sum(!is.na(dissolvedOxygen)), .groups = "drop") %>%
+                   count = sum(!is.na(dissolvedOxygen)),
+                   oxygen_sd = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
   dplyr::filter(count > 44) %>% 
   dplyr::select(time, siteID, sensorDepth, oxygen, oxygen_sd) %>% 
   dplyr::rename(depth_oxygen = sensorDepth)
@@ -54,8 +54,8 @@ temp_bouy_cleaned <- temp_bouy %>%
   dplyr::group_by(time, siteID, thermistorDepth) %>%
   dplyr::summarize(thermistorDepth = mean(thermistorDepth, na.rm = TRUE),
                    temperature = mean(tsdWaterTempMean, na.rm = TRUE),
-                   temperature_sd = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(48),
-                   count = sum(!is.na(tsdWaterTempMean)), .groups = "drop") %>%
+                   count = sum(!is.na(tsdWaterTempMean)),
+                   temperature_sd = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   dplyr::filter(count > 44) %>%  
   dplyr::rename(depth_temperature = thermistorDepth) %>% 
   dplyr::select(time, siteID, depth_temperature, temperature, temperature_sd)
@@ -66,8 +66,8 @@ temp_prt_cleaned <- temp_prt %>%
   dplyr::mutate(time = as_date(startDateTime)) %>% 
   dplyr::group_by(time, siteID) %>%
   dplyr::summarize(temperature = mean(surfWaterTempMean, na.rm = TRUE),
-                   temperature_sd = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(48),
-                   count = sum(!is.na(surfWaterTempMean)), .groups = "drop") %>%
+                   count = sum(!is.na(surfWaterTempMean)),
+                   temperature_sd = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   dplyr::filter(count > 44) %>% 
   dplyr::mutate(depth_temperature = NA) %>% 
   dplyr::select(time, siteID, depth_temperature, temperature, temperature_sd)
