@@ -263,17 +263,10 @@
     },
     "digest": {
       "Package": "digest",
-<<<<<<< HEAD
       "Version": "0.6.27",
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "a0cbe758a531d054b537d16dff4d58a1"
-=======
-      "Version": "0.6.26",
-      "Source": "Repository",
-      "Repository": "RSPM",
-      "Hash": "312b822306ececbbf7b9731937d9ec55"
->>>>>>> e9ca5e61cd76cab12a56725a3970a2eb73ea9916
     },
     "distributional": {
       "Package": "distributional",
@@ -515,13 +508,8 @@
       "RemoteRepo": "neonstore",
       "RemoteUsername": "cboettig",
       "RemoteRef": "HEAD",
-<<<<<<< HEAD
       "RemoteSha": "efd2aefb1928dce3f7e37940eab23408314c5b58",
       "Hash": "f0bb99ea9189414e700103b136b2db3c"
-=======
-      "RemoteSha": "a72e3b4022f2da6e9626e1e48339aa76f2b53cfd",
-      "Hash": "2d1eab1195da58afd181dff20af01541"
->>>>>>> e9ca5e61cd76cab12a56725a3970a2eb73ea9916
     },
     "nlme": {
       "Package": "nlme",

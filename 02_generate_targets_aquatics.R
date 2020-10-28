@@ -13,53 +13,76 @@ print(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
 neonstore::neon_store(table = "waq_instantaneous")
 neonstore::neon_store(table = "TSD_30_min")
+neonstore::neon_store(table = "TSW_30min")
 
 ## Load data from raw files
-focal_sites <- c("BARC","FLNT")
-oxy <- neonstore::neon_read(table = "waq_instantaneous", site = focal_sites)
+focal_sites <- c("BARC","POSE")
+oxy <- neonstore::neon_table(table = "waq_instantaneous", site = focal_sites)
 print(neonstore::neon_dir())
 print(getwd())
-temp <- neonstore::neon_read("TSD_30_min", site = focal_sites)
-
+temp_bouy <- neonstore::neon_table("TSD_30_min", site = focal_sites)
+temp_prt <- neonstore::neon_table("TSW_30min", site = focal_sites)
 
 #### Generate oxygen table #############
 
 oxy_cleaned <- oxy %>%
   dplyr::select(siteID, startDateTime, sensorDepth, dissolvedOxygen,
                 dissolvedOxygenExpUncert,dissolvedOxygenFinalQF) %>%
+  dplyr::mutate(sensorDepth = as.numeric(sensorDepth),
+                dissolvedOxygen = as.numeric(dissolvedOxygen),
+                dissolvedOxygenExpUncert = as.numeric(dissolvedOxygenExpUncert)) %>% 
   dplyr::filter(dissolvedOxygenFinalQF == 0,
-                sensorDepth > 0) %>%
+                (sensorDepth > 0 | is.na(sensorDepth)))%>%
   dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
-  dplyr::mutate(time = as_date(startDateTime)) %>% 
+  dplyr::mutate(time = as_date(startDateTime)) %>%
   dplyr::group_by(siteID, time) %>%
   dplyr::summarize(oxygen = mean(dissolvedOxygen, na.rm = TRUE),
-                   oxygen_sd = mean(dissolvedOxygenExpUncert, na.rm = TRUE),
-                   sensorDepth = mean(sensorDepth, na.rm = TRUE), .groups = "drop") %>%
-  dplyr::select(siteID, time, sensorDepth, oxygen, oxygen_sd) %>% 
+                   sensorDepth = mean(sensorDepth, na.rm = TRUE),
+                   oxygen_sd = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(48),
+                   count = sum(!is.na(dissolvedOxygen)), .groups = "drop") %>%
+  dplyr::filter(count > 44) %>% 
+  dplyr::select(time, siteID, sensorDepth, oxygen, oxygen_sd) %>% 
   dplyr::rename(depth_oxygen = sensorDepth)
+
 
 ### Generate surface (< 2 m) temperature #############
 
-temp_cleaned <- temp %>%
+temp_bouy_cleaned <- temp_bouy %>%
   dplyr::select(startDateTime, siteID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert, tsdWaterTempFinalQF) %>%
   dplyr::filter(thermistorDepth > 0.75 & thermistorDepth < 1.25 & tsdWaterTempFinalQF == 0) %>% 
   dplyr::mutate(time = as_date(startDateTime)) %>%
   dplyr::group_by(time, siteID, thermistorDepth) %>%
   dplyr::summarize(thermistorDepth = mean(thermistorDepth, na.rm = TRUE),
                    temperature = mean(tsdWaterTempMean, na.rm = TRUE),
-                   temperature_sd = mean(tsdWaterTempExpUncert, na.rm = TRUE), .groups = "drop") %>% 
-  dplyr::rename(depth_temperature = thermistorDepth)
+                   temperature_sd = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(48),
+                   count = sum(!is.na(tsdWaterTempMean)), .groups = "drop") %>%
+  dplyr::filter(count > 44) %>%  
+  dplyr::rename(depth_temperature = thermistorDepth) %>% 
+  dplyr::select(time, siteID, depth_temperature, temperature, temperature_sd)
+
+temp_prt_cleaned <- temp_prt %>%
+  dplyr::select(startDateTime, siteID, surfWaterTempMean, surfWaterTempExpUncert, finalQF) %>%
+  dplyr::filter(finalQF == 0) %>% 
+  dplyr::mutate(time = as_date(startDateTime)) %>% 
+  dplyr::group_by(time, siteID) %>%
+  dplyr::summarize(temperature = mean(surfWaterTempMean, na.rm = TRUE),
+                   temperature_sd = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(48),
+                   count = sum(!is.na(surfWaterTempMean)), .groups = "drop") %>%
+  dplyr::filter(count > 44) %>% 
+  dplyr::mutate(depth_temperature = NA) %>% 
+  dplyr::select(time, siteID, depth_temperature, temperature, temperature_sd)
+
+temp_cleaned <- rbind(temp_bouy_cleaned, temp_prt_cleaned)
 
 targets <- full_join(oxy_cleaned, temp_cleaned, by = c("time","siteID")) %>% 
   select(time, siteID, oxygen, temperature, oxygen_sd, temperature_sd, depth_oxygen, depth_temperature)
 
 targets %>% 
-  filter(siteID == "BARC") %>% 
-  select(time, oxygen, temperature) %>% 
-  pivot_longer(-time, names_to = "variable", values_to = "value") %>% 
+  select(time, siteID, oxygen, temperature) %>% 
+  pivot_longer(-c("time","siteID"), names_to = "variable", values_to = "value") %>% 
   ggplot(aes(x = time, y = value)) +
   geom_point() +
-  facet_wrap(~variable)
+  facet_wrap(siteID~variable)
 
 
 ### Write out the targets

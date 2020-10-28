@@ -18,7 +18,7 @@ download.file("https://data.ecoforecast.org/targets/aquatics/aquatics-targets.cs
 
 aquatic_targets <- read_csv("aquatics-targets.csv.gz", guess_max = 10000)
 oxygen <- aquatic_targets %>%
-  filter(siteID == "BARC",
+  filter(siteID == "BARC", #need to add POSE to the list
          time > as_date("2020-01-01")) %>% 
   select(time, siteID, oxygen, oxygen_sd)
 
@@ -42,27 +42,29 @@ RandomWalk = "
 model{
 
   # Priors
-  x[1] ~ dnorm(x_ic,tau_obs)
+  x[1] ~ dnorm(x_ic,tau_obs[1])
   tau_add ~ dgamma(0.1,0.1)
 
   # Process Model
   for(t in 2:n){
     x[t]~dnorm(x[t-1],tau_add)
-    x_obs[t] ~ dnorm(x[t],tau_obs)
+    x_obs[t] ~ dnorm(x[t],tau_obs_mean)
   }
 
   # Data Model
   for(i in 1:nobs){
-    y[i] ~ dnorm(x[y_wgaps_index[i]], tau_obs)
+    y[i] ~ dnorm(x[y_wgaps_index[i]], tau_obs[i])
   }
 
 }
 "
 
+sd_wgaps <- oxygen$oxygen_sd
 y_wgaps <- oxygen$oxygen
 time <- oxygen$time
 
 y_nogaps <- y_wgaps[!is.na(y_wgaps)]
+sd_nogaps <- sd_wgaps[!is.na(y_wgaps)]
 
 y_wgaps_index <- 1:length(y_wgaps)
 
@@ -74,8 +76,9 @@ data <- list(y = y_nogaps,
              y_wgaps_index = y_wgaps_index,
              nobs = length(y_wgaps_index),
              n = length(y_wgaps),
-             x_ic = 8.620833,
-             tau_obs = 1/(oxygen_sd^2))
+             x_ic = y_nogaps[1],
+             tau_obs_mean = mean(1/(sd_nogaps^2)),
+             tau_obs = 1/(sd_nogaps^2))
 
 nchain = 3
 chain_seeds <- c(200,800,1400)
@@ -87,15 +90,15 @@ for(i in 1:nchain){
                     x = init_x)
 }
 
-j.model   <- jags.model (file = textConnection(RandomWalk),
+j.model   <- jags.model(file = textConnection(RandomWalk),
                          data = data,
                          inits = init,
                          n.chains = 3)
 
-jags.out   <- coda.samples(model = j.model,variable.names = c("tau_add","tau_obs"), n.iter = 10000)
+jags.out   <- coda.samples(model = j.model,variable.names = c("tau_add"), n.iter = 10000)
 
 m   <- coda.samples(model = j.model,
-                    variable.names = c("x","tau_add","tau_obs", "x_obs"),
+                    variable.names = c("x","tau_add", "x_obs"),
                     n.iter = 10000,
                     thin = 5)
 
@@ -131,7 +134,7 @@ forecast_saved <- model_output %>%
   mutate(forecast_project_id = "EFInull")
 
 
-forecast_file_name <- paste0("aquatics-EFInull-",as_date(start_forecast),".csv.gz")
+forecast_file_name <- paste0("aquatics-",as_date(start_forecast),"-EFIpernull.csv.gz")
 print(paste0("Writing forecast to ", forecast_file_name))
 write_csv(forecast_saved, forecast_file_name)
 
