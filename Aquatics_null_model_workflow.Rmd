@@ -40,9 +40,10 @@ All the data download will be handled by a centralized script that acquires data
 for all themes.
 
 ```{r}
-focal_sites <- c("BARC","FLNT")
+focal_sites <- c("BARC","POSE")
 neonstore::neon_download("DP1.20288.001", site =  focal_sites, type="basic") #Water Quality
 neonstore::neon_download("DP1.20264.001", site =  focal_sites, type="basic") #Water Temperature
+neonstore::neon_download("DP1.20053.001", site = focal_sites, type = "basic") #Surface Water Temperature
 
 ```
 
