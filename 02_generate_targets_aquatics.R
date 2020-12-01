@@ -1,7 +1,5 @@
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
-renv::restore()
-
 ## 02_generate_targets_aquatics
 ## Process the raw data into the target variable product
 library(neonstore)
@@ -12,7 +10,7 @@ library(contentid)
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
 message("neon_store(table = 'waq_instantaneous')")
-neonstore::neon_store(table = "waq_instantaneous")
+neonstore::neon_store(table = "waq_instantaneous", n = 50)
 message("neon_store(table = 'TSD_30_min')")
 neonstore::neon_store(table = "TSD_30_min")
 message("neon_store(table = 'TSW_30min')")
