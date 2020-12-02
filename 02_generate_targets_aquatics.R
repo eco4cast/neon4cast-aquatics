@@ -23,7 +23,7 @@ oxy <- neonstore::neon_table(table = "waq_instantaneous", site = focal_sites)
 message("neon_table(table = 'TSD_30_min')")
 temp_bouy <- neonstore::neon_table("TSD_30_min", site = focal_sites)
 message("neon_table(table = 'TSW_30min')")
-temp_prt <- neonstore::neon_table("TSW_30min", site = focal_sites)
+temp_prt <- neonstore::neon_table("TSW_30min", site = focal_sites) # not availaable for BARC 
 
 #### Generate oxygen table #############
 
@@ -44,7 +44,8 @@ oxy_cleaned <- oxy %>%
                    oxygen_sd = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
   dplyr::filter(count > 44) %>% 
   dplyr::select(time, siteID, sensorDepth, oxygen, oxygen_sd) %>% 
-  dplyr::rename(depth_oxygen = sensorDepth)
+  dplyr::rename(depth_oxygen = sensorDepth) %>% 
+  mutate(neon_product_id = 'DP1.20288.001')
 
 
 ### Generate surface (< 2 m) temperature #############
@@ -60,7 +61,8 @@ temp_bouy_cleaned <- temp_bouy %>%
                    temperature_sd = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   dplyr::filter(count > 44) %>%  
   dplyr::rename(depth_temperature = thermistorDepth) %>% 
-  dplyr::select(time, siteID, depth_temperature, temperature, temperature_sd)
+  dplyr::select(time, siteID, depth_temperature, temperature, temperature_sd) %>% 
+  mutate(neon_product_id = 'DP1.20264.001')
 
 temp_prt_cleaned <- temp_prt %>%
   dplyr::select(startDateTime, siteID, surfWaterTempMean, surfWaterTempExpUncert, finalQF) %>%
@@ -72,12 +74,15 @@ temp_prt_cleaned <- temp_prt %>%
                    temperature_sd = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   dplyr::filter(count > 44) %>% 
   dplyr::mutate(depth_temperature = NA) %>% 
-  dplyr::select(time, siteID, depth_temperature, temperature, temperature_sd)
+  dplyr::select(time, siteID, depth_temperature, temperature, temperature_sd) %>% 
+  mutate(neon_product_id = 'DP1.20053.001')
 
 temp_cleaned <- rbind(temp_bouy_cleaned, temp_prt_cleaned)
 
 targets <- full_join(oxy_cleaned, temp_cleaned, by = c("time","siteID")) %>% 
-  select(time, siteID, oxygen, temperature, oxygen_sd, temperature_sd, depth_oxygen, depth_temperature)
+  select(time, siteID, oxygen, temperature, oxygen_sd, temperature_sd, depth_oxygen, depth_temperature, starts_with('neon_product_id')) %>% 
+  mutate(neon_product_ids = paste(neon_product_id.x, neon_product_id.y, sep = '; ')) %>% 
+  select(-neon_product_id.x, -neon_product_id.y)
 
 targets %>% 
   select(time, siteID, oxygen, temperature) %>% 
