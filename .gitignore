@@ -41,3 +41,7 @@ vignettes/*.pdf
 # NEON data 
 neon_store/*
 *.gz
+
+# forecast output 
+*figure.pdf
+*.xml
