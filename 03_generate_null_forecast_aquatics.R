@@ -30,10 +30,10 @@ generate_plots <- TRUE
 efi_server <- TRUE
 
 #' List of team members. Used in the generation of the metadata
-team_list <- list(list(individualName = list(givenName = "Quinn", surName = "Thomas"), 
-                       id = "https://orcid.org/0000-0003-1282-7825"),
-                  list(individualName = list(givenName = "Others",  surName ="Pending")),
-)
+#team_list <- list(list(individualName = list(givenName = "Quinn", surName = "Thomas"), 
+#                       id = "https://orcid.org/0000-0003-1282-7825"),
+#                  list(individualName = list(givenName = "Others",  surName ="Pending")),
+#)
 
 #'Team name code
 team_name <- "EFInull"
