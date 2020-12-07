@@ -49,6 +49,9 @@ targets <- read_csv("aquatics-targets.csv.gz", guess_max = 10000)
 #'Focal sites
 site_names <- c("BARC","POSE")
 
+#'Forecast horizon 
+f_days = 7 
+
 #'Generic random walk state-space model is JAGS format.  We use this model for 
 #'both the oxygen and temperature null forecasts
 RandomWalk = "
@@ -90,17 +93,17 @@ for(s in 1:length(site_names)){
   # forecast
   start_forecast <- max(site_data_var$time) + days(1)
   
-  # This is key here - I added 35 days on the end of the data for the forecast period
-  full_time <- tibble(time = seq(min(site_data_var$time), max(site_data_var$time) + days(7), by = "1 day"))
+  # This is key here - I added the forecast horizon on the end of the data for the forecast period
+  full_time <- tibble(time = seq(min(site_data_var$time), max(site_data_var$time) + days(f_days), by = "1 day"))
   
   # Join the full time with the site_data_var so there aren't gaps in the time column
   site_data_var <- left_join(full_time, site_data_var)
   
-  #observed NEE: Full time series with gaps
+  #observed oxygen: Full time series with gaps
   y_wgaps <- site_data_var$oxygen
   sd_wgaps <- imputeTS::na_interpolation(site_data_var$oxygen_sd,option = "linear")
   time <- c(site_data_var$time)
-  #observed NEE: time series without gaps
+  #observed oxygen: time series without gaps
   y_nogaps <- y_wgaps[!is.na(y_wgaps)]
   #Index: time series with gaps
   y_wgaps_index <- 1:length(y_wgaps)
@@ -207,7 +210,7 @@ for(s in 1:length(site_names)){
   max_time <- max(site_data_var$time) + days(1)
   
   start_forecast <- max_time
-  full_time <- tibble(time = seq(min(site_data_var$time), max(site_data_var$time) + days(7), by = "1 day"))
+  full_time <- tibble(time = seq(min(site_data_var$time), max(site_data_var$time) + days(f_days), by = "1 day"))
   
   site_data_var <- left_join(full_time, site_data_var)
   
@@ -289,7 +292,7 @@ for(s in 1:length(site_names)){
   forecast_saved_temperature <- rbind(forecast_saved_temperature, forecast_saved_tmp)
 }
 
-#'Combined the NEE and LE forecasts together and re-order column
+#'Combined the oxygen and temperature forecasts together and re-order column
 forecast_saved <- cbind(forecast_saved_oxygen, forecast_saved_temperature$temperature) %>% 
   rename(temperature = `forecast_saved_temperature$temperature`) %>% 
   select(time, ensemble, siteID, oxygen, temperature, obs_flag, forecast, data_assimilation)
