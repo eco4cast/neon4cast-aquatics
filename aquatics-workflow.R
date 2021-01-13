@@ -1,6 +1,8 @@
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 #remotes::install_github("cboettig/neonstore")
 
+devtools::install_deps()
+
 ## 02_generate_targets_aquatics
 ## Process the raw data into the target variable product
 library(neonstore)
