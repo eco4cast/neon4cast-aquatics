@@ -19,10 +19,6 @@ library(rjags)
 library(tidybayes)
 library(modelr)
 
-Sys.setenv("NEONSTORE_HOME" = "neon_store/")
-if(dir.exists("neon_store/")){
-  dir.create("neon_store/")
-}
 
 set.seed(329)
 
@@ -47,42 +43,58 @@ neonstore::neon_download("DP1.20053.001", site = focal_sites, type = "basic") #S
 
 ```
 
-## Step 2: Generate Targets
-
-Load data
-
 ```{r}
-oxy <- neonstore::neon_read(table = "waq_instantaneous", site = focal_sites)
-temp <- neonstore::neon_read("TSD_30_min", site = focal_sites)
+focal_sites <- c("BARC","POSE")
+neonstore::neon_store(product = "DP1.20288.001",  type="basic") #Water Quality
+neonstore::neon_store(product = "DP1.20264.001",  type="basic") #Water Temperature
+neonstore::neon_store(product = "DP1.20053.001",  type = "basic") #Surface Water Temperature
+
 ```
 
 
-Process oxygen data to hourly.
+## Step 2: Generate Targets
+
+Load data.  Since data are available in remote SQL database, we establish a 
+database connection instead of attempting to read the full data file into memory.
+`dplyr` commands are translated to SQL.  We can use the `collect` command to
+load the remote table into R memory when necessary.
+
+
+```{r}
+con <- neon_db()
+oxy <- tbl(con, "waq_instantaneous-basic") %>% filter(siteID %in% focal_sites)
+temp <- tbl(con, "TSD_30_min-basic")  %>% filter(siteID %in% focal_sites)
+```
+
+Process instantaneous oxygen data to hourly means:
 
 ```{r}
 oxy_cleaned <- oxy %>%
-  dplyr::select(siteID, startDateTime, sensorDepth, dissolvedOxygen,
+  select(siteID, startDateTime, sensorDepth, dissolvedOxygen,
                 dissolvedOxygenExpUncert,dissolvedOxygenFinalQF) %>%
-  dplyr::filter(dissolvedOxygenFinalQF == 0,
+  filter(dissolvedOxygenFinalQF == 0,
                 sensorDepth > 0) %>%
-  dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
-  dplyr::mutate(date = as_date(startDateTime),
+  mutate(startDateTime = as_datetime(startDateTime)) %>%
+  mutate(date = as_date(startDateTime),
                 hour = hour(startDateTime)) %>%
-  dplyr::group_by(siteID, date, hour) %>%
-  dplyr::summarize(sensorDepth = mean(sensorDepth, na.rm = TRUE),
+  group_by(siteID, date, hour) %>%
+  summarize(sensorDepth = mean(sensorDepth, na.rm = TRUE),
                    dissolvedOxygen = mean(dissolvedOxygen, na.rm = TRUE),
                    dissolvedOxygenExpUncert = mean(dissolvedOxygenExpUncert, na.rm = TRUE),
-                   sensorDepth = mean(sensorDepth, na.rm = TRUE), .groups = "drop") %>%
-  dplyr::mutate(startDateTime = make_datetime(year = year(date), month = month(date),
+                   .groups = "drop") %>%
+  ungroup() %>%
+  collect() %>%
+  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
                                               day = day(date), hour = hour,
                                               min = 0, tz ="UTC")) %>%
-  dplyr::select(siteID, startDateTime, sensorDepth, dissolvedOxygen, dissolvedOxygenExpUncert)
+  select(siteID, startDateTime, sensorDepth, dissolvedOxygen, dissolvedOxygenExpUncert)
 ```
 
 Visualize data
 
 ```{r}
-oxy_cleaned %>%
+oxy_cleaned %>% 
+  collect() %>%
   ggplot(aes(x = startDateTime, y = dissolvedOxygen)) +
   geom_point() +
   facet_wrap(~siteID) +
@@ -91,24 +103,25 @@ oxy_cleaned %>%
 
 ```{r}
 temp_cleaned <- temp %>%
-  dplyr::select(startDateTime, siteID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert) %>%
-  dplyr::mutate(date = as_date(startDateTime),
+  select(startDateTime, siteID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert) %>%
+  mutate(date = as_date(startDateTime),
                 hour = hour(startDateTime)) %>%
-  dplyr::group_by(date, siteID, hour,thermistorDepth) %>%
-  dplyr::summarize(tsdWaterTempMean = mean(tsdWaterTempMean, na.rm = TRUE),
-                   tsdWaterTempExpUncert = mean(tsdWaterTempExpUncert, na.rm = TRUE), .groups = "drop") %>%
-  dplyr::mutate(startDateTime = make_datetime(year = year(date), month = month(date),
+  group_by(date, siteID, hour,thermistorDepth) %>%
+  summarize(tsdWaterTempMean = mean(tsdWaterTempMean, na.rm = TRUE),
+            tsdWaterTempExpUncert = mean(tsdWaterTempExpUncert, na.rm = TRUE), .groups = "drop") %>%
+  collect() %>% # custom R functions like make_datetime require in-memory data
+  mutate(startDateTime = make_datetime(year = year(date), month = month(date),
                                               day = day(date), hour = hour, min = 0,
                                               tz ="UTC")) %>%
-  dplyr::select(startDateTime, siteID, tsdWaterTempMean,thermistorDepth,tsdWaterTempExpUncert) %>%
-  dplyr::group_by(startDateTime, siteID, thermistorDepth) %>%
-  dplyr::summarise(tsdWaterTempMean = mean(tsdWaterTempMean, na.rm = TRUE),
-                   tsdWaterTempExpUncert = mean(tsdWaterTempExpUncert), .groups = "drop") %>% 
-  dplyr::filter(thermistorDepth == min(thermistorDepth))
+  select(startDateTime, siteID, tsdWaterTempMean,thermistorDepth,tsdWaterTempExpUncert) %>%
+  group_by(startDateTime, siteID, thermistorDepth) %>%
+  summarise(tsdWaterTempMean = mean(tsdWaterTempMean, na.rm = TRUE),
+            tsdWaterTempExpUncert = mean(tsdWaterTempExpUncert), .groups = "drop") %>% 
+  filter(thermistorDepth == min(thermistorDepth))
 ```
 
 ```{r}
-temp_cleaned %>%
+temp_cleaned %>% 
   ggplot(aes(x = startDateTime, y = tsdWaterTempMean)) +
   geom_point() +
   facet_wrap(~siteID) +
@@ -464,6 +477,10 @@ EFIstandards::forecast_validator(my_eml)
 
 write_eml(my_eml, paste0("aquatics-EFInull-",as_date(start_forecast),"-eml.xml"))
 ```
+
+
+
+
 
 
 ## Step 4: Score forecast
