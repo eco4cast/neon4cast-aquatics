@@ -1,5 +1,5 @@
 Package: aquatics
 Version: 0.1.0
-Imports: tidyverse, lubridate, jsonlite, ecoforecastR, imputeTS,
-         contentid, aws.s3, prov, EML, yaml, rjags, tidybayes, EFIstandards 
+Imports: tidyverse, lubridate, contentid, aws.s3, prov, EML, yaml, EFIstandards, tools, ncdf4, scoringRules, imputeTS 
 Remotes: cboettig/prov, cboettig/contentid, eco4cast/EFIstandards, EcoForecast/ecoforecastR
+RoxygenNote: 7.1.1

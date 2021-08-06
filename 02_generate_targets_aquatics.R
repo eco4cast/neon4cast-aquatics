@@ -1,5 +1,8 @@
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
+Sys.setenv("NEONSTORE_HOME" = "/efi_neon_challenge/neonstore")
+Sys.setenv("NEONSTORE_DB" = "/efi_neon_challenge/neonstore")
+
 ## 02_generate_targets_aquatics
 ## Process the raw data into the target variable product
 library(neonstore)
@@ -7,14 +10,15 @@ library(tidyverse)
 library(lubridate)
 library(contentid)
 
+
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
-message("neon_store(table = 'waq_instantaneous')")
-neonstore::neon_store(table = "waq_instantaneous", n = 50)
-message("neon_store(table = 'TSD_30_min')")
-neonstore::neon_store(table = "TSD_30_min")
-message("neon_store(table = 'TSW_30min')")
-neonstore::neon_store(table = "TSW_30min")
+#message("neon_store(table = 'waq_instantaneous')")
+#neonstore::neon_store(table = "waq_instantaneous", n = 50)
+#message("neon_store(table = 'TSD_30_min')")
+#neonstore::neon_store(table = "TSD_30_min")
+#message("neon_store(table = 'TSW_30min')")
+#neonstore::neon_store(table = "TSW_30min")
 
 ## Load data from raw files
 focal_sites <- c("BARC","POSE")
@@ -65,6 +69,7 @@ temp_bouy_cleaned <- temp_bouy %>%
   mutate(neon_product_id = 'DP1.20264.001')
 
 temp_prt_cleaned <- temp_prt %>%
+  dplyr::filter(horizontalPosition == "102") %>% 
   dplyr::select(startDateTime, siteID, surfWaterTempMean, surfWaterTempExpUncert, finalQF) %>%
   dplyr::filter(finalQF == 0) %>% 
   dplyr::mutate(time = as_date(startDateTime)) %>% 
@@ -101,6 +106,7 @@ source("../neon4cast-shared-utilities/publish.R")
 publish(code = "02_generate_targets_aquatics.R",
         data_out = "aquatics-targets.csv.gz",
         prefix = "aquatics/",
-        bucket = "targets")
+        bucket = "targets",
+        registries = "https://hash-archive.carlboettiger.info")
 
 message(paste0("Completed Aquatics Target at ", Sys.time()))

@@ -180,7 +180,7 @@ for(s in 1:length(site_names)){
   
   #Filter only the forecasted dates and add columns for required variable
   forecast_saved_tmp <- model_output %>%
-    filter(time > start_forecast) %>%
+    filter(time >= start_forecast) %>%
     rename(oxygen = x_obs) %>% 
     mutate(data_assimilation = 0,
            forecast = 1,
@@ -280,7 +280,7 @@ for(s in 1:length(site_names)){
   }
   
   forecast_saved_tmp <- model_output %>%
-    filter(time > start_forecast) %>%
+    filter(time >= start_forecast) %>%
     rename(temperature = x_obs) %>% 
     mutate(data_assimilation = 0,
            forecast = 1,
@@ -331,5 +331,6 @@ if(efi_server){
           data_out = forecast_file,
           meta = meta_data_filename,
           prefix = "aquatics/",
-          bucket = "forecasts")
+          bucket = "forecasts",
+          registries = "https://hash-archive.carlboettiger.info")
 }
