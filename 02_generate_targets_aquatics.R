@@ -51,12 +51,31 @@ oxy_cleaned <- oxy %>%
   dplyr::rename(depth_oxygen = sensorDepth) %>% 
   mutate(neon_product_id = 'DP1.20288.001')
 
+chla_cleaned <- oxy %>%
+  dplyr::select(siteID, startDateTime, sensorDepth, chlorophyll,
+                chlorophyllExpUncert,chlorophyllFinalQF) %>%
+  dplyr::mutate(sensorDepth = as.numeric(sensorDepth),
+                chla = as.numeric(chlorophyll),
+                chlorophyllExpUncert = as.numeric(chlorophyllExpUncert)) %>% 
+  dplyr::filter(chlorophyllFinalQF == 0,
+                (sensorDepth > 0 | is.na(sensorDepth)))%>%
+  dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
+  dplyr::mutate(time = as_date(startDateTime)) %>%
+  dplyr::group_by(siteID, time) %>%
+  dplyr::summarize(chlorophyll = mean(chla, na.rm = TRUE),
+                   sensorDepth = mean(sensorDepth, na.rm = TRUE),
+                   count = sum(!is.na(chla)),
+                   chlorophyll_sd = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
+  dplyr::filter(count > 44) %>% 
+  dplyr::select(time, siteID, sensorDepth, chlorophyll, chlorophyll_sd) %>% 
+  dplyr::rename(depth_chlorophyll = sensorDepth) %>% 
+  mutate(neon_product_id = 'DP1.20288.001')
 
 ### Generate surface (< 2 m) temperature #############
 
 temp_bouy_cleaned <- temp_bouy %>%
   dplyr::select(startDateTime, siteID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert, tsdWaterTempFinalQF) %>%
-  dplyr::filter(thermistorDepth > 0.75 & thermistorDepth < 1.25 & tsdWaterTempFinalQF == 0) %>% 
+  dplyr::filter(thermistorDepth > 0.75 & thermistorDepth < 1.25 & (tsdWaterTempFinalQF == 0 | (tsdWaterTempFinalQF == 1 & as_date(startDateTime) > as_date("2020-07-01")))) %>% 
   dplyr::mutate(time = as_date(startDateTime)) %>%
   dplyr::group_by(time, siteID, thermistorDepth) %>%
   dplyr::summarize(thermistorDepth = mean(thermistorDepth, na.rm = TRUE),
@@ -107,6 +126,7 @@ publish(code = "02_generate_targets_aquatics.R",
         data_out = "aquatics-targets.csv.gz",
         prefix = "aquatics/",
         bucket = "targets",
+        provdb = "prov.tsv",
         registries = "https://hash-archive.carlboettiger.info")
 
 message(paste0("Completed Aquatics Target at ", Sys.time()))
