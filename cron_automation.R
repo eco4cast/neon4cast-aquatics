@@ -12,5 +12,5 @@ cmd <- cronR::cron_rscript(rscript = file.path(home_dir, aquatics_repo,"03_clima
                            rscript_log = file.path(log_dir, "aquatics-climatology.log"),
                            log_append = FALSE,
                            workdir = file.path(home_dir, aquatics_repo),
-                           trailing_arg = paste0("curl -fsS -m 10 --retry 5 -o /dev/null ", ))
+                           trailing_arg = paste0("curl -fsS -m 10 --retry 5 -o /dev/null ", health_checks_url))
 cronR::cron_add(command = cmd, frequency = 'daily', at = "11AM", id = 'aquatics-null-models')
