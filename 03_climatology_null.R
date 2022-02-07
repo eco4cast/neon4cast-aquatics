@@ -11,14 +11,13 @@ print(paste0("Running Creating Daily Terrestrial Forecasts at ", Sys.time()))
 #' EFIstandards is at remotes::install_github("eco4cast/EFIstandards")
 library(tidyverse)
 library(lubridate)
-library(rjags)
-library(tidybayes)
-library(modelr)
 library(aws.s3)
 library(prov)
 library(EFIstandards)
 library(EML)
 library(jsonlite)
+library(imputeTS)
+
 
 #' set the random number for reproducible MCMC runs
 set.seed(329)
@@ -36,21 +35,17 @@ efi_server <- TRUE
 #)
 
 #'Team name code
-team_name <- "EFInull"
-
-#'Download target file from the server
-download.file("https://data.ecoforecast.org/targets/aquatics/aquatics-targets.csv.gz",
-              "aquatics-targets.csv.gz")
+team_name <- "climatology"
 
 #'Read in target file.  The guess_max is specified because there could be a lot of
 #'NA values at the beginning of the file
-targets <- read_csv("aquatics-targets.csv.gz", guess_max = 10000)
+targets <- read_csv("https://data.ecoforecast.org/targets/aquatics/aquatics-targets.csv.gz", guess_max = 10000)
 
 sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20210928.csv")
 
 site_names <- sites$field_site_id
 
-target_clim <- target %>%  
+target_clim <- targets %>%  
   mutate(doy = yday(time)) %>% 
   group_by(doy, siteID) %>% 
   summarise(oxy_clim = mean(oxygen, na.rm = TRUE),
@@ -69,45 +64,77 @@ curr_month <- month(Sys.Date())
 if(curr_month < 10){
   curr_month <- paste0("0", curr_month)
 }
-#curr_year <- year(Sys.Date())
+
+
 curr_year <- year(Sys.Date())
-start_date <- as_date(paste(curr_year,curr_month, "01", sep = "-"))
+start_date <- Sys.Date() + days(1)
 
 forecast_dates <- seq(start_date, as_date(start_date + days(35)), "1 day")
 forecast_doy <- yday(forecast_dates)
 
-base_year <- year(Sys.Date() - days(35))
 
 forecast <- target_clim %>%
   mutate(doy = as.integer(doy)) %>% 
   filter(doy %in% forecast_doy) %>% 
-  mutate(time = as_date((doy-1), origin = paste(year(Sys.Date()), "01", "01", sep = "-")))
+  mutate(time = as_date(ifelse(doy > last(doy),
+                       as_date((doy-1), origin = paste(year(Sys.Date())+1, "01", "01", sep = "-")),
+                       as_date((doy-1), origin = paste(year(Sys.Date()), "01", "01", sep = "-")))))
+
+subseted_site_names <- unique(forecast$siteID)
+site_vector <- NULL
+for(i in 1:length(subseted_site_names)){
+  site_vector <- c(site_vector, rep(subseted_site_names[i], length(forecast_dates)))
+}
+
+forecast_tibble <- tibble(time = rep(forecast_dates, length(subseted_site_names)),
+                          siteID = site_vector)
 
 oxy <- forecast %>% 
   select(time, siteID, oxy_clim, oxy_sd) %>% 
   rename(mean = oxy_clim,
          sd = oxy_sd) %>% 
+  group_by(siteID) %>% 
+  mutate(mean = imputeTS::na_interpolation(mean, rule = 2, maxgap = 3),
+         sd = median(sd, na.rm = TRUE)) %>%
   pivot_longer(c("mean", "sd"),names_to = "statistic", values_to = "oxygen")
 
-oxy <- forecast %>% 
+chla <- forecast %>% 
   select(time, siteID, chla_clim, chla_sd) %>% 
   rename(mean = chla_clim,
          sd = chla_sd) %>% 
+  group_by(siteID) %>% 
+  mutate(mean = imputeTS::na_interpolation(mean, rule = 2, maxgap = 3),
+         sd = median(sd, na.rm = TRUE)) %>%
   pivot_longer(c("mean", "sd"),names_to = "statistic", values_to = "chla")
 
 combined <- forecast %>% 
   select(time, siteID, temp_clim, temp_sd) %>% 
   rename(mean = temp_clim,
          sd = temp_sd) %>% 
+  group_by(siteID) %>% 
+  mutate(mean = imputeTS::na_interpolation(mean, rule = 2, maxgap = 3),
+         sd = median(sd, na.rm = TRUE)) %>%
   pivot_longer(c("mean", "sd"),names_to = "statistic", values_to = "temperature") %>% 
   full_join(oxy) %>% 
   full_join(chla) %>% 
   mutate(data_assimilation = 0,
          forecast = 1) %>% 
-  select(time, siteID, statistic, forecast, oxygen, temperature) %>% 
-  arrange(siteID, time, statistic)
+  select(time, siteID, statistic, forecast, oxygen, chla, temperature) %>% 
+  arrange(siteID, time, statistic) 
+  
+combined %>% 
+  select(time, oxygen ,statistic, siteID) %>% 
+  pivot_wider(names_from = statistic, values_from = oxygen) %>% 
+  ggplot(aes(x = time)) +
+  geom_ribbon(aes(ymin=mean - sd*1.96, ymax=mean + sd*1.96), alpha = 0.1) + 
+  geom_point(aes(y = mean)) +
+  facet_wrap(~siteID)
 
 forecast_file <- paste("aquatics", min(combined$time), "climatology.csv.gz", sep = "-")
+
+neon4cast::submit(forecast_file = forecast_file, 
+                  metadata = NULL, 
+                  ask = FALSE)
 
 
 

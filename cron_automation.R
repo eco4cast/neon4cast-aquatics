@@ -8,7 +8,7 @@ aquatics_repo <- "neon4cast-aquatics"
 #Go to healthchecks.io. Create a project.  Add a check. Copy the url and add here.  
 health_checks_url <- "https://hc-ping.com/a848914e-9abf-45e4-bcf3-27f570cc3623"
 
-cmd <- cronR::cron_rscript(rscript = file.path(home_dir, aquatics_repo,"03_generate_null_forecast_aquatics.R"),
+cmd <- cronR::cron_rscript(rscript = file.path(home_dir, aquatics_repo,"03_climatology_null.R"),
                            rscript_log = file.path(log_dir, "aquatics-climatology.log"),
                            log_append = FALSE,
                            workdir = file.path(home_dir, aquatics_repo),

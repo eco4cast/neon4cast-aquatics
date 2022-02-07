@@ -38,7 +38,7 @@ wq_cleaned <- wq_raw %>%
                 dissolvedOxygenExpUncert = as.numeric(dissolvedOxygenExpUncert),
                 chla = as.numeric(chlorophyll),
                 chlorophyllExpUncert = as.numeric(chlorophyllExpUncert)) %>% 
-  dplyr::filter((sensorDepth > 0 | is.na(sensorDepth))) %>%
+  dplyr::filter(((sensorDepth > 0 & sensorDepth < 1)| is.na(sensorDepth))) %>%
   dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
   dplyr::mutate(time = as_date(startDateTime)) %>%
   dplyr::mutate(dissolvedOxygen = ifelse(dissolvedOxygenFinalQF == 0, dissolvedOxygen, NA),
@@ -55,7 +55,7 @@ wq_cleaned <- wq_raw %>%
   dplyr::rename(depth_oxygen = sensorDepth)
 
 wq_cleaned %>% 
-  ggplot(aes(x = time, y = oxygen)) +
+  ggplot(aes(x = time, y = chla)) +
   geom_point() +
   facet_wrap(~siteID)
 
