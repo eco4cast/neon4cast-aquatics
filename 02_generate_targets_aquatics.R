@@ -59,7 +59,7 @@ wq_cleaned %>%
   geom_point() +
   facet_wrap(~siteID)
 
-### Generate surface (< 2 m) temperature #############
+### Generate surface (< 1 m) temperature #############
 
 temp_bouy_cleaned <- temp_bouy %>%
   dplyr::select(startDateTime, siteID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert, tsdWaterTempFinalQF) %>%

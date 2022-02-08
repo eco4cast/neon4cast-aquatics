@@ -94,7 +94,7 @@ oxy <- forecast %>%
   rename(mean = oxy_clim,
          sd = oxy_sd) %>% 
   group_by(siteID) %>% 
-  mutate(mean = imputeTS::na_interpolation(mean, rule = 2, maxgap = 3),
+  mutate(mean = imputeTS::na_interpolation(mean, maxgap = 3),
          sd = median(sd, na.rm = TRUE)) %>%
   pivot_longer(c("mean", "sd"),names_to = "statistic", values_to = "oxygen")
 
@@ -103,7 +103,7 @@ chla <- forecast %>%
   rename(mean = chla_clim,
          sd = chla_sd) %>% 
   group_by(siteID) %>% 
-  mutate(mean = imputeTS::na_interpolation(mean, rule = 2, maxgap = 3),
+  mutate(mean = imputeTS::na_interpolation(mean, maxgap = 3),
          sd = median(sd, na.rm = TRUE)) %>%
   pivot_longer(c("mean", "sd"),names_to = "statistic", values_to = "chla")
 
@@ -112,7 +112,7 @@ combined <- forecast %>%
   rename(mean = temp_clim,
          sd = temp_sd) %>% 
   group_by(siteID) %>% 
-  mutate(mean = imputeTS::na_interpolation(mean, rule = 2, maxgap = 3),
+  mutate(mean = imputeTS::na_interpolation(mean, maxgap = 3),
          sd = median(sd, na.rm = TRUE)) %>%
   pivot_longer(c("mean", "sd"),names_to = "statistic", values_to = "temperature") %>% 
   full_join(oxy) %>% 
@@ -131,6 +131,8 @@ combined %>%
   facet_wrap(~siteID)
 
 forecast_file <- paste("aquatics", min(combined$time), "climatology.csv.gz", sep = "-")
+
+write_csv(combined, forecast_file)
 
 neon4cast::submit(forecast_file = forecast_file, 
                   metadata = NULL, 
