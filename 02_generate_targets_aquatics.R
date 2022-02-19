@@ -10,13 +10,22 @@ library(tidyverse)
 library(lubridate)
 library(contentid)
 
-
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
 sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20210928.csv")
 
 
 focal_sites <- sites$field_site_id
+
+message("Downloading: DP1.20288.001")
+neonstore::neon_download("DP1.20288.001",site = focal_sites, type = "basic")
+neonstore::neon_store(table = "waq_instantaneous", n = 50)
+message("Downloading: DP1.20264.001")
+neonstore::neon_download("DP1.20264.001", site =  focal_sites, type = "basic")
+neonstore::neon_store(table = "TSD_30_min")
+message("Downloading: DP1.20053.001")
+neonstore::neon_download("DP1.20053.001", site =  focal_sites, type = "basic")
+neonstore::neon_store(table = "TSW_30min")
 
 ## Load data from raw files
 message("neon_table(table = 'waq_instantaneous')")
