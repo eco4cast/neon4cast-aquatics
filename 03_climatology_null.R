@@ -39,18 +39,21 @@ team_name <- "climatology"
 
 #'Read in target file.  The guess_max is specified because there could be a lot of
 #'NA values at the beginning of the file
-targets <- read_csv("https://data.ecoforecast.org/targets/aquatics/aquatics-targets.csv.gz", guess_max = 10000)
+#targets <- read_csv("https://data.ecoforecast.org/targets/aquatics/aquatics-targets.csv.gz", guess_max = 10000)
+targets <- read_csv("aquatics-targets.csv.gz")
+
 
 sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20210928.csv")
 
-site_names <- sites$field_site_id
+site_names <- c(sites$field_site_id, c("SUGG", "PRLA", "PRPO", "LIRO"))
 
+# calculates a doy average for each target variable in each site
 target_clim <- targets %>%  
   mutate(doy = yday(time)) %>% 
   group_by(doy, siteID) %>% 
   summarise(oxy_clim = mean(oxygen, na.rm = TRUE),
             temp_clim = mean(temperature, na.rm = TRUE),
-            chla_clim = mean(temperature, na.rm = TRUE),
+            chla_clim = mean(chla, na.rm = TRUE),
             oxy_sd = sd(oxygen, na.rm = TRUE),
             temp_sd = sd(temperature, na.rm = TRUE), 
             chla_sd = sd(chla, na.rm = TRUE),
@@ -122,21 +125,44 @@ combined <- forecast %>%
   select(time, siteID, statistic, forecast, oxygen, chla, temperature) %>% 
   arrange(siteID, time, statistic) 
   
+# plot the forecasts
+combined %>% 
+  select(time, chla ,statistic, siteID) %>% 
+  pivot_wider(names_from = statistic, values_from = chla) %>% 
+  ggplot(aes(x = time)) +
+  geom_ribbon(aes(ymin=mean - sd*1.96, ymax=mean + sd*1.96), alpha = 0.1) + 
+  geom_point(aes(y = mean)) +
+  labs(y = "chla") +
+  facet_wrap(~siteID, scales = "free")
+ggsave("chla_clim.png", width = 10, height = 10)
+
+combined %>%
+  select(time, temperature ,statistic, siteID) %>% 
+  pivot_wider(names_from = statistic, values_from = temperature) %>% 
+  ggplot(aes(x = time)) +
+  geom_ribbon(aes(ymin=mean - sd*1.96, ymax=mean + sd*1.96), alpha = 0.1) + 
+  geom_point(aes(y = mean)) +
+  labs(y = "temperature") +
+  facet_wrap(~siteID)
+ggsave("temperature_clim.png", width = 10, height = 10)
+
 combined %>% 
   select(time, oxygen ,statistic, siteID) %>% 
   pivot_wider(names_from = statistic, values_from = oxygen) %>% 
   ggplot(aes(x = time)) +
   geom_ribbon(aes(ymin=mean - sd*1.96, ymax=mean + sd*1.96), alpha = 0.1) + 
   geom_point(aes(y = mean)) +
-  facet_wrap(~siteID)
+  labs(y = "oxygen") +
+  facet_wrap(~siteID, scales = "free")
+ggsave("oxygen_clim.png", width = 10, height = 10)
 
 forecast_file <- paste("aquatics", min(combined$time), "climatology.csv.gz", sep = "-")
 
 write_csv(combined, forecast_file)
 
-neon4cast::submit(forecast_file = forecast_file, 
-                  metadata = NULL, 
-                  ask = FALSE)
+# neon4cast::submit(forecast_file = forecast_file, 
+#                   metadata = NULL, 
+#                   ask = FALSE)
 
 
 
