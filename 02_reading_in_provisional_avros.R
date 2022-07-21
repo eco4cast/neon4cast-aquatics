@@ -31,3 +31,10 @@ wq_avro <- spark_read_avro(sc, name = 'name', path = file_path_sc) %>%
   mutate(Value = ifelse(is.na(doubleValue), 
                         intValue, doubleValue)) %>%
   select(any_of(columns_keep))
+
+
+wq_tibble <- wq_avro %>%
+  as_tibble() %>%
+  arrange(startDate, termName) %>%
+  pivot_wider(names_from = termName, values_from = Value)  %>%
+  filter_at(vars(ends_with('QF')), any_vars(. !=1)) # checks to see if any of the QF cols have a 1
