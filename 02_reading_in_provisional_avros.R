@@ -38,3 +38,24 @@ wq_tibble <- wq_avro %>%
   arrange(startDate, termName) %>%
   pivot_wider(names_from = termName, values_from = Value)  %>%
   filter_at(vars(ends_with('QF')), any_vars(. !=1)) # checks to see if any of the QF cols have a 1
+
+# if the filtering has left rows then find the mean
+if (nrow(wq_tibble) >=1) {
+  daily_wq <- wq_tibble  %>%
+    mutate(time = as.Date(startDate),
+           # add missing columns
+           chlorophyll = ifelse('chlorophyll' %in% colnames(wq_tibble), chlorophyll, NA),
+           chlorophyllExpUncert = ifelse('chlorophyll' %in% colnames(wq_tibble), chlorophyllExpUncert, NA)) %>%
+    group_by(siteName, time) %>%
+    summarize(oxygen_obs = mean(dissolvedOxygen, na.rm = TRUE),
+              chla_obs = mean(chlorophyll, na.rm = TRUE),
+              #why only using the count of non-NA in DO?
+              count = sum(!is.na(dissolvedOxygen)),
+              chla_error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
+              oxygen_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
+    rename(siteID = siteName) %>%
+    select(-count) %>%
+    pivot_longer(cols = !c(time, siteID), names_to = c("variable", "stat"), names_sep = "_") %>%
+    pivot_wider(names_from = stat, values_from = value)
+}
+
