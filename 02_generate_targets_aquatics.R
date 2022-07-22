@@ -73,12 +73,14 @@ for (i in 1:length(rivers_and_streams)) {
                      sensorDepth = mean(sensorDepth, na.rm = TRUE),
                      chla_obs = mean(chla, na.rm = TRUE),
                      
+                     oxygen_sd = sd(dissolvedOxygen, na.rm = TRUE),
+                     chla_sd = sd(chla, na.rm = TRUE),
                      #why only using the count of non-NA in DO?
                      count = sum(!is.na(dissolvedOxygen)),
                      chla_error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
                      oxygen_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
     #dplyr::filter(count > 44) %>% 
-    dplyr::select(time, siteID, oxygen_obs, chla_obs, oxygen_error, chla_error) %>% 
+    dplyr::select(time, siteID, oxygen_obs, chla_obs,oxygen_sd, chla_sd, oxygen_error, chla_error) %>% 
     
     
     
@@ -135,8 +137,7 @@ wq_cleaned_flagged <- wq_cleaned_full %>%
                               variable == "oxygen", NA, 
                             ifelse(siteID == "BARC" & 
                                      obs < 4 &
-                                     variable == "oxygen", NA, error))),
-         sd = NA)
+                                     variable == "oxygen", NA, error))), sd = NA)
 
 #===============================================#
 ### Generate surface (< 1 m) temperature #############
