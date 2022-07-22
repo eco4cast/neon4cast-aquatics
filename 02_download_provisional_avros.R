@@ -13,17 +13,12 @@ new_month_wq <- unique(format(c((as.Date(max(wq_cleaned$time)) %m+% months(1)), 
 # look in each repository to see if there are files that match the current maximum month of the NEON
 # store data
 for (i in 1:length(current_sites)) {
-  superseded <-
-  dir(path = paste0(download_location, current_sites[i]),
-      pattern = cur_neon_store_month)
-if (length(superseded) != 0) {
-  file.remove(paste0(
-    paste0(download_location, current_sites[i]),
-    '/',
-    superseded
-  ))
+  superseded <-  dir(path = paste0(download_location, 'site=', current_sites[i]),
+                     pattern = '2022-06')
+  if (length(superseded) != 0) {
+    file.remove(paste0(download_location,'site=', current_sites[i], '/',superseded))
+  }
 }
-
 
 ##### water quality data ####
 for (i in 1:length(current_sites)) {
@@ -38,6 +33,7 @@ for (i in 1:length(current_sites)) {
   # loop through each month (max 2)
   for (month_use in new_month_wq) {
   # download the provisional files from Google Cloud Storage using the gsutils tool from cmd
+    # -n argument skips files already downloaded
   system(paste0('gsutil -m cp -n gs://neon-is-transition-output/provisional/dpid=DP1.20288.001/ms=',
       # -n excludes already downloaded files
       # -m cp runs the copy function in parallel to speed up download
@@ -55,3 +51,28 @@ for (i in 1:length(current_sites)) {
 }
 #===============================#
 
+  
+#### temperature at specific depth ####
+cur_tsd_month <-
+  format(as.Date(max(temp_bouy_cleaned$time)), "%Y-%m")
+# what is the next month from this plus the current month? These might be the same
+new_month_tsd <-
+  unique(format(c((as.Date(max(temp_bouy_cleaned$time)) %m+% months(1)), Sys.Date()), "%Y-%m"))
+
+# for specific depth data product download all sites so don't need to loop through
+# loop through each month (max 2)
+for (month_use in new_months) {
+  # download the provisional files from Google Cloud Storage using the gsutils tool from cmd
+    # -n argument skips files already downloaded
+    # -r is the recursive argument
+    # creates a separate file for each site in the download location formatted site=*
+  system(paste0('gsutil -m cp -n -r gs://neon-is-transition-output/provisional/dpid=DP1.20264.001/ms=',
+                # -n excludes already downloaded files
+                # -m cp runs the copy function in parallel to speed up download
+                month_use,
+                '/* ',
+                download_location),
+         ignore.stderr = T)
+  print(month_use)
+}
+#=======================================#
