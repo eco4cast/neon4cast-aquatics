@@ -38,3 +38,15 @@ download_neon_avro <- function(months, sites, data_product, path) {
 }
 # no error is thrown if the data product doesn't exist for that site
  
+
+# delete the superseded files
+delete_neon_avro <- function(months, sites, path) {
+  for (i in 1:length(sites)) {
+    superseded <-  dir(path = paste0(path, 'site=', sites[i]),
+                       pattern = cur_month)
+    
+    if (length(superseded) != 0) {
+      file.remove(paste0(path,'site=', sites[i], '/',superseded))
+    }
+  }
+}
