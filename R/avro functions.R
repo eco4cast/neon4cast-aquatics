@@ -1,5 +1,5 @@
 
-download_neon_avro <- function(months, sites, data_product, path) {
+download.neon.avro <- function(months, sites, data_product, path) {
   for (i in 1:length(sites)) {
     # create a directory for each site (if one doesn't already exist)
     if (paste0('site=', sites[i]) %in% list.dirs(path, full.names = F)) {
@@ -40,7 +40,7 @@ download_neon_avro <- function(months, sites, data_product, path) {
  
 
 # delete the superseded files
-delete_neon_avro <- function(months, sites, path) {
+delete.neon.avro <- function(months, sites, path) {
   for (i in 1:length(sites)) {
     superseded <-  dir(path = paste0(path, 'site=', sites[i]),
                        pattern = months)
@@ -52,7 +52,7 @@ delete_neon_avro <- function(months, sites, path) {
 }
 
 # requires wq_vars - specify
-read.avro.wq <- function(sc, name = 'name', path = path) {
+read.avro.wq <- function(sc, name = 'name', path) {
   message(paste0('reading file ', path))
   wq_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
                                         path = path) %>%
@@ -118,7 +118,7 @@ read.avro.wq <- function(sc, name = 'name', path = path) {
   }
 }
 
-read.avro.tsd <- function(sc, name = 'name', path = path, thermistor_depths) {
+read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
   message(paste0('reading file ', path))
   tsd_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
                                          path = path) %>%
@@ -190,7 +190,7 @@ read.avro.tsd <- function(sc, name = 'name', path = path, thermistor_depths) {
 }
 
 
-read.avro.prt <- function(sc, name = 'name', path = path) {
+read.avro.prt <- function(sc, name = 'name', path) {
   message(paste0('reading file ', path))
   prt_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
                                          path = path) %>%
@@ -253,4 +253,20 @@ read.avro.prt <- function(sc, name = 'name', path = path) {
   }
 }
 
+
+# wrapper function for a generic read avro function that selects the right 
+  # read_avro_... depending on the data product
+read.neon.avro <- function(path, sc, data_product, ...) {
+  if (data_product == '20288') {
+    message('running read.avro for water quality')
+    df <- read.avro.wq(path = path, sc = sc)
+  } else if (data_product == '20264') {
+    message('running read.avro for temperature at specific depth')
+    df <- read.avro.tsd(path = path, sc = sc, thermistor_depths = thermistor_depths)
+  } else if (data_product == '20053') {
+    message('running read.avro for surface temperature')
+    df <- read.avro.prt(path = path, sc = sc)
+  }
+  return(df)
+} 
 
