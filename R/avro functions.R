@@ -98,7 +98,12 @@ read.avro.wq <- function(sc, name = 'name', path = path) {
                      names_sep = "_") %>%
         pivot_wider(names_from = stat, values_from = value)
       
-    } else {
+    } 
+  }
+  
+  if (exists('daily_wq')) {
+    return(daily_wq)
+  } else {
       # create an empty df to return
       empty <- data.frame(siteID = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
         mutate(siteID = as.character(siteID),
@@ -107,12 +112,7 @@ read.avro.wq <- function(sc, name = 'name', path = path) {
                obs = as.numeric(obs),
                error = as.numeric(error)) %>%
         filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
-    }
-  }
-  if (exists('daily_wq')) {
-    return(daily_wq)
-  } else {
-    return(empty)
+      return(empty)
   }
 }
 
