@@ -189,3 +189,68 @@ read.avro.tsd <- function(sc, name = 'name', path = path, thermistor_depths) {
   }
 }
 
+
+read.avro.prt <- function(sc, name = 'name', path = path) {
+  message(paste0('reading file ', path))
+  prt_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
+                                         path = path) %>%
+    filter(termName %in% prt_vars) %>%
+    # for streams want to omit the downstream measurement (102) and retain upstream (101)
+    # rivers and lakes horizontal index is 103
+    filter(horizontalIndex %in% c('101', '103'), 
+           temporalIndex == 030) %>% # take the 30-minutely data only
+    select(siteName, termName, startDate, 
+           doubleValue, intValue) %>%
+    # combine the value fields to one
+    mutate(Value = ifelse(is.na(doubleValue), 
+                          intValue, doubleValue)) %>%
+    select(any_of(columns_keep)) 
+  
+  
+  prt_tibble <- prt_avro %>%
+    as.data.frame() %>%
+    suppressWarnings()
+  
+  if (nrow(prt_tibble) >=1) {
+    prt_tibble_wider <- prt_tibble %>%
+      arrange(startDate, termName) %>%
+      pivot_wider(names_from = termName, values_from = Value) %>%
+      filter_at(vars(ends_with('QF')), any_vars(. != 1)) # checks to see if any of the QF cols have a 1
+    
+    # if the filtering has left rows then find the mean
+    if (nrow(prt_tibble_wider) >= 1) {
+      daily_prt <- prt_tibble_wider  %>%
+        mutate(time = as.Date(startDate)) %>%
+        group_by(siteName, time) %>%
+        summarize(temperature_obs = mean(surfWaterTempMean, na.rm = TRUE),
+                  count = sum(!is.na(surfWaterTempMean)),
+                  temperature_error = mean(surfWaterTempMean, na.rm = TRUE) / sqrt(count),
+                  temperature_sd = sd(surfWaterTempMean, na.rm = TRUE),
+                  .groups = "drop") %>%
+        rename(siteID = siteName) %>%
+        select(-count) %>%
+        # get in the same long format as the NEON portal data
+        pivot_longer(cols = !c(time, siteID), 
+                     names_to = c("variable", "stat"), 
+                     names_sep = "_") %>%
+        pivot_wider(names_from = stat, values_from = value)
+      
+    } 
+  }
+  
+  if (exists('daily_prt')) {
+    return(daily_prt)
+  } else {
+    # create an empty df to return
+    empty <- data.frame(siteID = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
+      mutate(siteID = as.character(siteID),
+             time = as.Date(time),
+             variable = as.character(variable),
+             obs = as.numeric(obs),
+             error = as.numeric(error)) %>%
+      filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
+    return(empty)
+  }
+}
+
+
