@@ -257,6 +257,19 @@ read.avro.prt <- function(sc, name = 'name', path) {
 # wrapper function for a generic read avro function that selects the right 
   # read_avro_... depending on the data product
 read.neon.avro <- function(path, sc, data_product, ...) {
+  # the function is only available for 3 data products (wq, tsd, and prt)
+  if (data_product != '20288' |
+      data_product != '20264' |
+      data_product != '20053') {
+    stop('No read avro function for this data product')
+  }
+  
+  #does the data product match the file path specified 
+  if (str_detect(path, data_product) == FALSE) {
+    stop('Data product does not match path')
+  }
+  
+  # use the right function based on the data product specified
   if (data_product == '20288') {
     message('running read.avro for water quality')
     df <- read.avro.wq(path = path, sc = sc)
@@ -269,4 +282,3 @@ read.neon.avro <- function(path, sc, data_product, ...) {
   }
   return(df)
 } 
-
