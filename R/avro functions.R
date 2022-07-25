@@ -82,8 +82,8 @@ read.avro.wq <- function(sc, name = 'name', path = path) {
       daily_wq <- wq_tibble_wider  %>%
         mutate(time = as.Date(startDate),
                # add missing columns (sites with no chlorophyll), need all otherwise function won't run
-               chlorophyll = ifelse('chlorophyll' %in% colnames(wq_tibble), chlorophyll, NA),
-               chlorophyllExpUncert = ifelse('chlorophyll' %in% colnames(wq_tibble),chlorophyllExpUncert,NA)) %>%
+               chlorophyll = ifelse('chlorophyll' %in% colnames(wq_tibble_wider), chlorophyll, NA),
+               chlorophyllExpUncert = ifelse('chlorophyll' %in% colnames(wq_tibble_wider),chlorophyllExpUncert,NA)) %>%
         group_by(siteName, time) %>%
         summarize(oxygen_obs = mean(dissolvedOxygen, na.rm = TRUE),
                   chla_obs = mean(chlorophyll, na.rm = TRUE),
@@ -115,6 +115,77 @@ read.avro.wq <- function(sc, name = 'name', path = path) {
                error = as.numeric(error)) %>%
         filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
       return(empty)
+  }
+}
+
+read.avro.tsd <- function(sc, name = 'name', path = path, thermistor_depths) {
+  message(paste0('reading file ', path))
+  tsd_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
+                                         path = path) %>%
+    filter(termName %in% tsd_vars) %>%
+    # for streams want to omit the downstream measurement (102) and retain upstream (101)
+    # rivers and lakes horizontal index is 103
+    filter(horizontalIndex %in% c('101', '103'), 
+           temporalIndex == 030) %>% # take the 30-minutely data only
+    select(siteName, termName, startDate, 
+           doubleValue, intValue, verticalIndex) %>%
+    # combine the value fields to one
+    mutate(Value = ifelse(is.na(doubleValue), 
+                          intValue, doubleValue)) %>%
+    select(any_of(columns_keep)) 
+  
+  
+  tsd_tibble <- tsd_avro %>%
+    as.data.frame() %>%
+    suppressWarnings() %>%
+    inner_join(., thermistor_depths, by = c('siteName', 'verticalIndex')) %>%
+    # only want temperatures in the surface (< 1 m) of the water column
+    filter(thermistorDepth <= 1.0) 
+  
+  if (nrow(tsd_tibble) >=1) {
+    tsd_tibble_wider <- tsd_tibble %>%
+      arrange(startDate, termName) %>%
+      pivot_wider(names_from = termName, values_from = Value) %>%
+      filter_at(vars(ends_with('QF')), any_vars(. != 1)) # checks to see if any of the QF cols have a 1
+    
+    # if the filtering has left rows then find the mean
+    if (nrow(tsd_tibble_wider) >= 1) {
+      daily_tsd <- tsd_tibble_wider  %>%
+        mutate(time = as.Date(startDate)) %>%
+        # add missing columns (sites with no tsdWaterTempMean), need all otherwise function won't run
+        # tsdWaterTempMean = ifelse('tsdWaterTempMean' %in% colnames(tsd_tibble_wider), 
+        #                           tsdWaterTempMean, NA),
+        # tsdWaterTempExpUncert = ifelse('tsdWaterTempExpUncert' %in% colnames(tsd_tibble_wider),
+        #                                tsdWaterTempExpUncert, NA)) %>%
+        group_by(siteName, time) %>%
+        summarize(temperature_obs = mean(tsdWaterTempMean, na.rm = TRUE),
+                  count = sum(!is.na(tsdWaterTempMean)),
+                  temperature_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
+                  temperature_sd = sd(tsdWaterTempMean, na.rm = TRUE),
+                  .groups = "drop") %>%
+        rename(siteID = siteName) %>%
+        select(-count) %>%
+        # get in the same long format as the NEON portal data
+        pivot_longer(cols = !c(time, siteID), 
+                     names_to = c("variable", "stat"), 
+                     names_sep = "_") %>%
+        pivot_wider(names_from = stat, values_from = value)
+      
+    } 
+  }
+  
+  if (exists('daily_tsd')) {
+    return(daily_tsd)
+  } else {
+    # create an empty df to return
+    empty <- data.frame(siteID = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
+      mutate(siteID = as.character(siteID),
+             time = as.Date(time),
+             variable = as.character(variable),
+             obs = as.numeric(obs),
+             error = as.numeric(error)) %>%
+      filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
+    return(empty)
   }
 }
 
