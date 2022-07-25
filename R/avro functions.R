@@ -87,6 +87,8 @@ read.avro.wq <- function(sc, name = 'name', path = path) {
         group_by(siteName, time) %>%
         summarize(oxygen_obs = mean(dissolvedOxygen, na.rm = TRUE),
                   chla_obs = mean(chlorophyll, na.rm = TRUE),
+                  oxygen_sd = sd(dissolvedOxygen, na.rm = TRUE),
+                  chla_sd = sd(chlorophyll, na.rm = TRUE),
                   count = sum(!is.na(dissolvedOxygen)),
                   chla_error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
                   oxygen_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
