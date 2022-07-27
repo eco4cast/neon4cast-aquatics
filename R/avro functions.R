@@ -92,10 +92,10 @@ read.avro.wq <- function(sc, name = 'name', path) {
                   count = sum(!is.na(dissolvedOxygen)),
                   chla_error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
                   oxygen_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
-        rename(site_ID = siteName) %>%
+        rename(site_id = siteName) %>%
         select(-count) %>%
         # get in the same long format as the NEON portal data
-        pivot_longer(cols = !c(time, site_ID), 
+        pivot_longer(cols = !c(time, site_id), 
                      names_to = c("variable", "stat"), 
                      names_sep = "_") %>%
         pivot_wider(names_from = stat, values_from = value)
@@ -103,7 +103,7 @@ read.avro.wq <- function(sc, name = 'name', path) {
     } 
   }
   
-  if (unique(daily_wq$site_ID) %in% stream_sites) {
+  if (unique(daily_wq$site_id) %in% stream_sites) {
     daily_wq <- daily_wq %>% filter(variable == "oxygen")
   }
   
@@ -111,8 +111,8 @@ read.avro.wq <- function(sc, name = 'name', path) {
     return(daily_wq)
   } else {
       # create an empty df to return
-      empty <- data.frame(site_ID = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
-        mutate(site_ID = as.character(site_ID),
+      empty <- data.frame(site_id = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
+        mutate(site_id = as.character(site_id),
                time = as.Date(time),
                variable = as.character(variable),
                obs = as.numeric(obs),
@@ -167,10 +167,10 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
                   temperature_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
                   temperature_sd = sd(tsdWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
-        rename(site_ID = siteName) %>%
+        rename(site_id = siteName) %>%
         select(-count) %>%
         # get in the same long format as the NEON portal data
-        pivot_longer(cols = !c(time, site_ID), 
+        pivot_longer(cols = !c(time, site_id), 
                      names_to = c("variable", "stat"), 
                      names_sep = "_") %>%
         pivot_wider(names_from = stat, values_from = value)
@@ -182,8 +182,8 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
     return(daily_tsd)
   } else {
     # create an empty df to return
-    empty <- data.frame(site_ID = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
-      mutate(site_ID = as.character(site_ID),
+    empty <- data.frame(site_id = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
+      mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
              obs = as.numeric(obs),
@@ -231,10 +231,10 @@ read.avro.prt <- function(sc, name = 'name', path) {
                   temperature_error = mean(surfWaterTempMean, na.rm = TRUE) / sqrt(count),
                   temperature_sd = sd(surfWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
-        rename(site_ID = siteName) %>%
+        rename(site_id = siteName) %>%
         select(-count) %>%
         # get in the same long format as the NEON portal data
-        pivot_longer(cols = !c(time, site_ID), 
+        pivot_longer(cols = !c(time, site_id), 
                      names_to = c("variable", "stat"), 
                      names_sep = "_") %>%
         pivot_wider(names_from = stat, values_from = value)
@@ -246,8 +246,8 @@ read.avro.prt <- function(sc, name = 'name', path) {
     return(daily_prt)
   } else {
     # create an empty df to return
-    empty <- data.frame(site_ID = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
-      mutate(site_ID = as.character(site_ID),
+    empty <- data.frame(site_id = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
+      mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
              obs = as.numeric(obs),
