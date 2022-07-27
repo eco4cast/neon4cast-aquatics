@@ -18,30 +18,22 @@ source('R/avro functions.R')
 
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
-sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20210928.csv")
-aquatic_sites <- read.csv("../Aquatic NEON sites.csv")[, c("field_site_id", "field_site_type", "field_site_subtype")]
+sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20220727.csv")
 
-original_sites <- sites$field_site_id
-additional_lakes <- aquatic_sites$field_site_id[which(aquatic_sites$field_site_id %!in% original_sites & 
-                                                        aquatic_sites$field_site_subtype == "Lake")]
-nonwadable_rivers <- aquatic_sites$field_site_id[(which(aquatic_sites$field_site_subtype == "Non-wadeable River"))]
-lake_sites <- aquatic_sites$field_site_id[(which(aquatic_sites$field_site_subtype == "Lake"))]
-# selected sites based on data availability
-stream_sites <- c("ARIK", "MAYF", "WLOU", "KING", "HOPB", "MCRA", "LECO", "WALK", "PRIN", "LEWI")
-rivers_and_streams <- c(stream_sites, nonwadable_rivers)
+nonwadable_rivers <- sites$field_site_id[(which(sites$field_site_subtype == "Non-wadeable River"))]
+lake_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Lake"))]
+stream_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Wadeable Stream"))]
 
-current_sites <- c(original_sites, additional_lakes, nonwadable_rivers, stream_sites)
-missing_sites <- aquatic_sites$field_site_id[-which(as.vector(aquatic_sites$field_site_id) %in% current_sites)]
 #======================================================#
 
 message("Downloading: DP1.20288.001")
-neonstore::neon_download("DP1.20288.001",site = current_sites, type = "basic")
+neonstore::neon_download("DP1.20288.001",site = sites, type = "basic")
 neonstore::neon_store(table = "waq_instantaneous", n = 50)
 message("Downloading: DP1.20264.001")
-neonstore::neon_download("DP1.20264.001", site =  current_sites, type = "basic")
+neonstore::neon_download("DP1.20264.001", site =  sites, type = "basic")
 neonstore::neon_store(table = "TSD_30_min")
 message("Downloading: DP1.20053.001")
-neonstore::neon_download("DP1.20053.001", site =  current_sites, type = "basic")
+neonstore::neon_download("DP1.20053.001", site =  sites, type = "basic")
 neonstore::neon_store(table = "TSW_30min")
 
 ## Load data from raw files
@@ -54,8 +46,8 @@ neonstore::neon_store(table = "TSW_30min")
 
 
 #### Generate WQ table #############
-for (i in 1:length(current_sites)) {
-  wq_portal <- neonstore::neon_table(table = "waq_instantaneous", site = current_sites[i]) %>% #wq_raw %>% 
+for (i in 1:length(sites)) {
+  wq_portal <- neonstore::neon_table(table = "waq_instantaneous", site = sites[i]) %>% #wq_raw %>% 
     dplyr::select(siteID, startDateTime, sensorDepth,
                   dissolvedOxygen,dissolvedOxygenExpUncert,dissolvedOxygenFinalQF, 
                   chlorophyll, chlorophyllExpUncert,chlorophyllFinalQF) %>%
@@ -105,7 +97,7 @@ for (i in 1:length(current_sites)) {
   } else {
     wq_portal_full <- wq_portal
   }
-  print(paste0(i, "/", length(current_sites)))
+  print(paste0(i, "/", length(sites)))
 }
 #====================================================#
 
@@ -128,13 +120,13 @@ new_month_wq <- unique(format(c((as.Date(max(wq_cleaned$time)) %m+% months(1)), 
       # store data
 
 delete.neon.avro(months = cur_wq_month,
-                 sites = current_sites, 
+                 sites = sites, 
                  path = download_location)
 
 
 # Download any new files from the Google Cloud
 download.neon.avro(months = new_month_wq, 
-                   sites = current_sites, 
+                   sites = sites, 
                    data_product = '20288',  # WQ data product
                    path = download_location)
 
@@ -215,7 +207,7 @@ wq_cleaned <- wq_full %>%
   # "raw data" (L1 NEON data product) is the 30 min average taken from 1 min measurements
 
 ## lake temperatures ##
-temp_bouy <- neonstore::neon_table("TSD_30_min", site = current_sites) %>%
+temp_bouy <- neonstore::neon_table("TSD_30_min", site = sites) %>%
   rename(site_ID = siteID) %>%
   dplyr::select(startDateTime, site_ID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert, tsdWaterTempFinalQF, verticalPosition) %>%
   # errors in the sensor depths reported - see "https://www.neonscience.org/impact/observatory-blog/incorrect-depths-associated-lake-and-river-temperature-profiles"
@@ -312,7 +304,7 @@ temp_bouy <- neonstore::neon_table("TSD_30_min", site = current_sites) %>%
 
  
 ## river temperatures ##
-temp_prt <- neonstore::neon_table("TSW_30min", site = current_sites) %>%
+temp_prt <- neonstore::neon_table("TSW_30min", site = sites) %>%
   rename(site_ID = siteID) %>%
   # horizontal position is upstream or downstream is 101 or 102 horizontal position
   dplyr::filter(horizontalPosition == "101") %>%  # take upstream to match WQ data
