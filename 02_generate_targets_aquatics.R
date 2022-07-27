@@ -27,13 +27,13 @@ stream_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Wadeable
 #======================================================#
 
 message("Downloading: DP1.20288.001")
-neonstore::neon_download("DP1.20288.001",site = sites, type = "basic")
+neonstore::neon_download("DP1.20288.001",site = sites$field_site_id, type = "basic")
 neonstore::neon_store(table = "waq_instantaneous", n = 50)
 message("Downloading: DP1.20264.001")
-neonstore::neon_download("DP1.20264.001", site =  sites, type = "basic")
+neonstore::neon_download("DP1.20264.001", site =  sites$field_site_id, type = "basic")
 neonstore::neon_store(table = "TSD_30_min")
 message("Downloading: DP1.20053.001")
-neonstore::neon_download("DP1.20053.001", site =  sites, type = "basic")
+neonstore::neon_download("DP1.20053.001", site =  sites$field_site_id, type = "basic")
 neonstore::neon_store(table = "TSW_30min")
 
 ## Load data from raw files
