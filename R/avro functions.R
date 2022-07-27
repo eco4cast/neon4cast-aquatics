@@ -103,6 +103,10 @@ read.avro.wq <- function(sc, name = 'name', path) {
     } 
   }
   
+  if (unique(daily_wq$siteID) %in% stream_sites) {
+    daily_wq <- daily_wq %>% filter(variable == "oxygen")
+  }
+  
   if (exists('daily_wq')) {
     return(daily_wq)
   } else {
