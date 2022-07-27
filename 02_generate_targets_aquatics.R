@@ -183,22 +183,33 @@ wq_cleaned <- wq_full %>%
   # manual cleaning based on visual inspection
   mutate(obs = ifelse(site_ID == "MAYF" & 
                         between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                        variable == "oxygen", NA, 
-                      ifelse(site_ID == "WLOU" &
-                               !between(obs, 7.5, 11) &
-                               variable == "oxygen", NA, 
-                             ifelse(site_ID == "BARC" & 
-                                      obs < 4 &
-                                      variable == "oxygen", NA, obs))),
+                        variable == "oxygen", NA, obs),
+         obs = ifelse(site_ID == "WLOU" &
+                        !between(obs, 7.5, 11) & 
+                        variable == "oxygen", NA, obs),
+         obs = ifelse(site_ID == "BARC" & 
+                        obs < 4 &
+                        variable == "oxygen", NA, obs),
+         
          error = ifelse(site_ID == "MAYF" &
                        between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                       variable == "oxygen", NA, 
-                     ifelse(site_ID == "WLOU" &
-                              !between(obs, 7.5, 11) &
-                              variable == "oxygen", NA, 
-                            ifelse(site_ID == "BARC" & 
-                                     obs < 4 &
-                                     variable == "oxygen", NA, error))), sd = NA)
+                       variable == "oxygen", NA, error),
+         error = ifelse(site_ID == "WLOU" &
+                          !between(obs, 7.5, 11) & 
+                          variable == "oxygen", NA, error),
+         error = ifelse(site_ID == "BARC" & 
+                          obs < 4 &
+                          variable == "oxygen", NA, error),
+         
+         sd = ifelse(site_ID == "MAYF" & 
+                        between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
+                        variable == "oxygen", NA, obs),
+         sd = ifelse(site_ID == "WLOU" &
+                        !between(obs, 7.5, 11) & 
+                        variable == "oxygen", NA, obs),
+         sd = ifelse(site_ID == "BARC" & 
+                        obs < 4 &
+                        variable == "oxygen", NA, obs))
 
 #===============================================#
 
