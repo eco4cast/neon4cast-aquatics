@@ -46,8 +46,8 @@ neonstore::neon_store(table = "TSW_30min")
 
 
 #### Generate WQ table #############
-for (i in 1:length(sites)) {
-  wq_portal <- neonstore::neon_table(table = "waq_instantaneous", site = sites[i]) %>% #wq_raw %>% 
+for (i in 1:length(sites$field_site_id)) {
+  wq_portal <- neonstore::neon_table(table = "waq_instantaneous", site = sites$field_site_id[i]) %>% #wq_raw %>% 
     dplyr::select(siteID, startDateTime, sensorDepth,
                   dissolvedOxygen,dissolvedOxygenExpUncert,dissolvedOxygenFinalQF, 
                   chlorophyll, chlorophyllExpUncert,chlorophyllFinalQF) %>%
@@ -68,9 +68,9 @@ for (i in 1:length(sites)) {
     dplyr::mutate(dissolvedOxygen = ifelse(dissolvedOxygenFinalQF == 0, dissolvedOxygen, NA),
                   chla = ifelse(chlorophyllFinalQF == 0, chla, NA)) %>% 
     dplyr::group_by(site_id, time) %>%
-    dplyr::summarize(oxygen_obs = mean(dissolvedOxygen, na.rm = TRUE),
+    dplyr::summarize(oxygen_observation = mean(dissolvedOxygen, na.rm = TRUE),
                      sensorDepth = mean(sensorDepth, na.rm = TRUE),
-                     chla_obs = mean(chla, na.rm = TRUE),
+                     chla_observation = mean(chla, na.rm = TRUE),
                      
                      oxygen_sd = sd(dissolvedOxygen, na.rm = TRUE),
                      chla_sd = sd(chla, na.rm = TRUE),
@@ -79,7 +79,7 @@ for (i in 1:length(sites)) {
                      chla_error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
                      oxygen_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
     #dplyr::filter(count > 44) %>% 
-    dplyr::select(time, site_id, oxygen_obs, chla_obs,oxygen_sd, chla_sd, oxygen_error, chla_error) %>% 
+    dplyr::select(time, site_id, oxygen_observation, chla_observation,oxygen_sd, chla_sd, oxygen_error, chla_error) %>% 
     
     
     
@@ -97,7 +97,7 @@ for (i in 1:length(sites)) {
   } else {
     wq_portal_full <- wq_portal
   }
-  print(paste0(i, "/", length(sites)))
+  print(paste0(i, "/", length(sites$field_site_id)))
 }
 #====================================================#
 
@@ -109,9 +109,9 @@ download_location <- 'C:/Users/freya/Downloads/'
 
 # need to figure out which month's data are required
 # what is in the NEON store db?
-cur_wq_month <- format(as.Date(max(wq_cleaned$time)), "%Y-%m")
+cur_wq_month <- format(as.Date(max(wq_portal_full$time)), "%Y-%m")
 # what is the next month from this plus the current month? These might be the same
-new_month_wq <- unique(format(c((as.Date(max(wq_cleaned$time)) %m+% months(1)), Sys.Date()), "%Y-%m"))
+new_month_wq <- unique(format(c((as.Date(max(wq_portal_full$time)) %m+% months(1)), Sys.Date()), "%Y-%m"))
 
 
 # Start by deleting superseded files
@@ -120,13 +120,13 @@ new_month_wq <- unique(format(c((as.Date(max(wq_cleaned$time)) %m+% months(1)), 
       # store data
 
 delete.neon.avro(months = cur_wq_month,
-                 sites = sites, 
+                 sites = unique(sites$field_site_id), 
                  path = download_location)
 
 
 # Download any new files from the Google Cloud
 download.neon.avro(months = new_month_wq, 
-                   sites = sites, 
+                   sites = unique(sites$field_site_id), 
                    data_product = '20288',  # WQ data product
                    path = download_location)
 
@@ -177,39 +177,39 @@ chla_min <- 0
 # outside the ranges specified about
 
 wq_cleaned <- wq_full %>%
-  mutate(obs = ifelse(is.na(obs),
-                          obs, ifelse(obs >= DO_min & obs <= DO_max & variable == 'oxygen', 
-                                    obs, ifelse(obs >= chla_min & obs <= chla_max & variable == 'chla', obs, NA)))) %>%
+  mutate(observation = ifelse(is.na(observation),
+                          observation, ifelse(observation >= DO_min & observation <= DO_max & variable == 'oxygen', 
+                                    observation, ifelse(observation >= chla_min & observation <= chla_max & variable == 'chla', observation, NA)))) %>%
   # manual cleaning based on visual inspection
-  mutate(obs = ifelse(site_id == "MAYF" & 
+  mutate(observation = ifelse(site_id == "MAYF" & 
                         between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                        variable == "oxygen", NA, obs),
-         obs = ifelse(site_id == "WLOU" &
-                        !between(obs, 7.5, 11) & 
-                        variable == "oxygen", NA, obs),
-         obs = ifelse(site_id == "BARC" & 
-                        obs < 4 &
-                        variable == "oxygen", NA, obs),
+                        variable == "oxygen", NA, observation),
+         observation = ifelse(site_id == "WLOU" &
+                        !between(observation, 7.5, 11) & 
+                        variable == "oxygen", NA, observation),
+         observation = ifelse(site_id == "BARC" & 
+                        observation < 4 &
+                        variable == "oxygen", NA, observation),
          
          error = ifelse(site_id == "MAYF" &
                        between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
                        variable == "oxygen", NA, error),
          error = ifelse(site_id == "WLOU" &
-                          !between(obs, 7.5, 11) & 
+                          !between(observation, 7.5, 11) & 
                           variable == "oxygen", NA, error),
          error = ifelse(site_id == "BARC" & 
-                          obs < 4 &
+                          observation < 4 &
                           variable == "oxygen", NA, error),
          
          sd = ifelse(site_id == "MAYF" & 
                         between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                        variable == "oxygen", NA, obs),
+                        variable == "oxygen", NA, sd),
          sd = ifelse(site_id == "WLOU" &
-                        !between(obs, 7.5, 11) & 
-                        variable == "oxygen", NA, obs),
+                        !between(observation, 7.5, 11) & 
+                        variable == "oxygen", NA, sd),
          sd = ifelse(site_id == "BARC" & 
-                        obs < 4 &
-                        variable == "oxygen", NA, obs))
+                        observation < 4 &
+                        variable == "oxygen", NA, sd))
 
 #===============================================#
 
@@ -218,7 +218,7 @@ wq_cleaned <- wq_full %>%
   # "raw data" (L1 NEON data product) is the 30 min average taken from 1 min measurements
 
 ## lake temperatures ##
-temp_bouy <- neonstore::neon_table("TSD_30_min", site = sites) %>%
+temp_bouy <- neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
   rename(site_id = siteID) %>%
   dplyr::select(startDateTime, site_id, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert, tsdWaterTempFinalQF, verticalPosition) %>%
   # errors in the sensor depths reported - see "https://www.neonscience.org/impact/observatory-blog/incorrect-depths-associated-lake-and-river-temperature-profiles"
@@ -306,16 +306,16 @@ temp_bouy <- neonstore::neon_table("TSD_30_min", site = sites) %>%
   dplyr::filter(thermistorDepth <= 1.0 & (tsdWaterTempFinalQF == 0 | (tsdWaterTempFinalQF == 1 & as_date(startDateTime) > as_date("2020-07-01")))) %>% 
   dplyr::mutate(time = as_date(startDateTime)) %>%
   dplyr::group_by(time, site_id) %>% # use all the depths
-  dplyr::summarize(temperature_obs = mean(tsdWaterTempMean, na.rm = TRUE),
+  dplyr::summarize(temperature_observation = mean(tsdWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(tsdWaterTempMean)),
                    temperature_sd = sd(tsdWaterTempMean, na.rm = T),
                    temperature_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>%  
-  dplyr::select(time, site_id, temperature_obs, temperature_sd, temperature_error) 
+  dplyr::select(time, site_id, temperature_observation, temperature_sd, temperature_error) 
 
  
 ## river temperatures ##
-temp_prt <- neonstore::neon_table("TSW_30min", site = sites) %>%
+temp_prt <- neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
   rename(site_id = siteID) %>%
   # horizontal position is upstream or downstream is 101 or 102 horizontal position
   dplyr::filter(horizontalPosition == "101") %>%  # take upstream to match WQ data
@@ -323,18 +323,84 @@ temp_prt <- neonstore::neon_table("TSW_30min", site = sites) %>%
   dplyr::filter(finalQF == 0) %>% 
   dplyr::mutate(time = as_date(startDateTime)) %>% 
   dplyr::group_by(time, site_id) %>%
-  dplyr::summarize(temperature_obs = mean(surfWaterTempMean, na.rm = TRUE),
+  dplyr::summarize(temperature_observation = mean(surfWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(surfWaterTempMean)),
                    temperature_sd = sd(surfWaterTempMean),
                    temperature_error = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>% 
-  dplyr::select(time, site_id, temperature_obs, temperature_sd, temperature_error) 
+  dplyr::select(time, site_id, temperature_observation, temperature_sd, temperature_error) 
 
-temp_buoy_tsd <- rbind(temp_bouy, temp_prt)
-
-temp_longer <- temp_buoy_tsd %>%
+temp_tsd_prt <- rbind(temp_bouy, temp_prt) %>%
   pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "_") %>%
   pivot_wider(names_from = stat, values_from = value)
+
+
+#========= low latency water temperature data =========
+# download the 24/48hr provisional data from the Google Cloud
+
+# Start by deleting superseded files
+# Files that have been supersed by the NEON store files can be deleted from the relevent repository
+# Look in each repository to see if there are files that match the current maximum month of the NEON
+# store data
+
+delete.neon.avro(months = cur_wq_month,
+                 sites = unique(sites$field_site_id), 
+                 path = download_location)
+
+
+# Download any new files from the Google Cloud
+download.neon.avro(months = new_month_wq, 
+                   sites = unique(sites$field_site_id), 
+                   data_product = '20264',  # WQ data product
+                   path = download_location)
+
+# Read in the new files to append to the NEONstore data
+# connect to spark locally 
+sc <- sparklyr::spark_connect(master = "local")
+
+# The variables (term names that should be kept)
+tsd_vars <- c('siteName',
+             'startDate',
+             'tsdWaterTempMean', 
+             'thermistorDepth', 
+             'tsdWaterTempExpUncert',
+             'tsdWaterTempFinalQF')
+columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
+thermistor_depths <- read_csv('thermistorDepths.csv', col_types = 'ccd')
+
+# Generate a list of files to be read
+tsd_avro_files <- paste0(gsub('C:', '', download_location),
+                        list.files(path = download_location, 
+                                   pattern = '*20264', 
+                                   recursive = T))
+
+# Read in each of the files and then bind by rows
+tsd_avro_df <- map_dfr(.x = tsd_avro_files, ~ read.avro.tsd(sc= sc, path = .x, thermistor_depths = thermistor_depths))
+
+
+# The variables (term names that should be kept)
+prt_vars <- c('siteName',
+              'startDate',
+              'surfWaterTempMean',
+              'surfWaterTempExpUncert', 
+              'finalQF')
+
+# Generate a list of files to be read
+prt_avro_files <- paste0(gsub('C:', '', download_location),
+                         list.files(path = download_location, 
+                                    pattern = '*20053', 
+                                    recursive = T))
+
+# Read in each of the files and then bind by rows
+prt_avro_df <- map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc, path = .x))
+
+
+# Combine the avro files with the portal data
+temp_full <- bind_rows(temp_tsd_prt, tsd_avro_df, prt_avro_df) %>%
+  arrange(site_id, time)
+
+
+#==============================#
 
 # additional QC steps implemented (FO, 2022-07-13)
 ##### check 1 Gross range tests on temperature
@@ -344,16 +410,16 @@ T_min <- -2 # gross min
 
 # GR flag will be true if the temperature is outside the range specified 
 temp_cleaned <-
-  temp_longer %>%
-  mutate(obs =ifelse(obs >= T_min & obs <= T_max , 
-                                    obs, NA),
-         sd = ifelse(obs >= T_min & obs <= T_max , 
+  temp_full %>%
+  mutate(observation =ifelse(observation >= T_min & observation <= T_max , 
+                                    observation, NA),
+         sd = ifelse(observation >= T_min & observation <= T_max , 
                      sd, NA),
-         error = ifelse(obs >= T_min & obs <= T_max , 
+         error = ifelse(observation >= T_min & observation <= T_max , 
                      error, NA))  %>%
-  # manual cleaning based on observations
-  mutate(obs = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
-                      NA, obs),
+  # manual cleaning based on observationervations
+  mutate(observation = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
+                      NA, observation),
          sd = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
                       NA, sd),
          error = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
@@ -361,19 +427,9 @@ temp_cleaned <-
  
 
 #==============================================
-# targets <- full_join(wq_cleaned, temp_cleaned, by = c("time","site_id")) %>% 
-#   select(time, site_id, oxygen, temperature, chla, oxygen_sd, temperature_sd, chla_sd, depth_WQ, depth_temperature)
-# 
-# targets %>% 
-#   select(time, site_id, oxygen, temperature, chla) %>% 
-#   pivot_longer(-c("time","site_id"), names_to = "variable", values_to = "value") %>% 
-#   ggplot(aes(x = time, y = value)) +
-#   geom_point() +
-#   facet_grid(variable~site_id, scales = "free")
-
 targets_long <- rbind(wq_cleaned, temp_cleaned) %>%
   arrange(site_id, time, variable) %>%
-  mutate(obs = ifelse(is.nan(obs), NA, obs),
+  mutate(observation = ifelse(is.nan(observation), NA, observation),
          sd = ifelse(is.nan(sd), NA, sd),
          error = ifelse(is.nan(error), NA, error))
 
