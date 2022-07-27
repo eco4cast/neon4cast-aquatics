@@ -184,7 +184,7 @@ chla_min <- 0
 # GR flag will be true if either the DO concentration or the chlorophyll are 
 # outside the ranges specified about
 
-wq_clean <- wq_full %>%
+wq_cleaned <- wq_full %>%
   mutate(obs = ifelse(is.na(obs),
                           obs, ifelse(obs >= DO_min & obs <= DO_max & variable == 'oxygen', 
                                     obs, ifelse(obs >= chla_min & obs <= chla_max & variable == 'chla', obs, NA)))) %>%
@@ -215,7 +215,8 @@ wq_clean <- wq_full %>%
   # "raw data" (L1 NEON data product) is the 30 min average taken from 1 min measurements
 
 ## lake temperatures ##
-temp_bouy_cleaned <- neonstore::neon_table("TSD_30_min", site = current_sites) %>%
+temp_bouy <- neonstore::neon_table("TSD_30_min", site = current_sites) %>%
+  rename(site_ID = siteID) %>%
   dplyr::select(startDateTime, site_ID, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert, tsdWaterTempFinalQF, verticalPosition) %>%
   # errors in the sensor depths reported - see "https://www.neonscience.org/impact/observatory-blog/incorrect-depths-associated-lake-and-river-temperature-profiles"
     # sensor depths are manually assigned based on "vertical position" variable as per table on webpage
@@ -302,34 +303,33 @@ temp_bouy_cleaned <- neonstore::neon_table("TSD_30_min", site = current_sites) %
   dplyr::filter(thermistorDepth <= 1.0 & (tsdWaterTempFinalQF == 0 | (tsdWaterTempFinalQF == 1 & as_date(startDateTime) > as_date("2020-07-01")))) %>% 
   dplyr::mutate(time = as_date(startDateTime)) %>%
   dplyr::group_by(time, site_ID) %>% # use all the depths
-  dplyr::summarize(temperature = mean(tsdWaterTempMean, na.rm = TRUE),
+  dplyr::summarize(temperature_obs = mean(tsdWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(tsdWaterTempMean)),
                    temperature_sd = sd(tsdWaterTempMean, na.rm = T),
                    temperature_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>%  
-  dplyr::select(time, site_ID, temperature, temperature_sd, temperature_error) 
+  dplyr::select(time, site_ID, temperature_obs, temperature_sd, temperature_error) 
 
  
 ## river temperatures ##
-temp_prt_cleaned <- neonstore::neon_table("TSW_30min", site = current_sites) %>%
+temp_prt <- neonstore::neon_table("TSW_30min", site = current_sites) %>%
+  rename(site_ID = siteID) %>%
   # horizontal position is upstream or downstream is 101 or 102 horizontal position
   dplyr::filter(horizontalPosition == "101") %>%  # take upstream to match WQ data
   dplyr::select(startDateTime, site_ID, surfWaterTempMean, surfWaterTempExpUncert, finalQF) %>%
   dplyr::filter(finalQF == 0) %>% 
   dplyr::mutate(time = as_date(startDateTime)) %>% 
   dplyr::group_by(time, site_ID) %>%
-  dplyr::summarize(temperature = mean(surfWaterTempMean, na.rm = TRUE),
+  dplyr::summarize(temperature_obs = mean(surfWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(surfWaterTempMean)),
+                   temperature_sd = sd(surfWaterTempMean),
                    temperature_error = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>% 
-  dplyr::select(time, site_ID, temperature, temperature_error) %>%
-  dplyr::mutate(temperature_sd = NA) # add an empty sd col so that we can rbind with buoy temps
+  dplyr::select(time, site_ID, temperature_obs, temperature_sd, temperature_error) 
 
+temp_buoy_tsd <- rbind(temp_bouy, temp_prt)
 
-temp_cleaned <- rbind(temp_bouy_cleaned, temp_prt_cleaned)
-
-temp_longer <- temp_cleaned %>%
-  rename(temperature_obs = temperature) %>%
+temp_longer <- temp_buoy_tsd %>%
   pivot_longer(cols = !c(time, site_ID), names_to = c("variable", "stat"), names_sep = "_") %>%
   pivot_wider(names_from = stat, values_from = value)
 
@@ -340,7 +340,7 @@ T_max <- 32 # gross max
 T_min <- -2 # gross min
 
 # GR flag will be true if the temperature is outside the range specified 
-temp_cleaned_flagged <-
+temp_cleaned <-
   temp_longer %>%
   mutate(obs =ifelse(obs >= T_min & obs <= T_max , 
                                     obs, NA),
@@ -368,11 +368,11 @@ temp_cleaned_flagged <-
 #   geom_point() +
 #   facet_grid(variable~site_ID, scales = "free")
 
-targets_long <- rbind(wq_cleaned_flagged, temp_cleaned_flagged) %>%
+targets_long <- rbind(wq_cleaned, temp_cleaned) %>%
   arrange(site_ID, time, variable)
 
 ### Write out the targets
-write_csv(targets_long, "aquatics-targets (rivers + streams).csv.gz")
+write_csv(targets_long, "aquatics-targets.csv.gz")
 
 ## Publish the targets to EFI.  Assumes aws.s3 env vars are configured.
 source("../neon4cast-shared-utilities/publish.R")
