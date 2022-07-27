@@ -18,7 +18,7 @@ source('R/avro functions.R')
 
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
-sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20220727.csv")
+sites <- read_csv("https://raw.githubusercontent.com/OlssonF/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20220727.csv")
 
 nonwadable_rivers <- sites$field_site_id[(which(sites$field_site_subtype == "Non-wadeable River"))]
 lake_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Lake"))]
@@ -88,12 +88,13 @@ for (i in 1:length(sites$field_site_id)) {
   
   # if its a stream site we don't want the chlorophyll
   if (unique(wq_portal$site_id) %in% stream_sites) {
-    wq_portal <- wq_portal %>% filter(variable == "oxygen")
+    wq_portal <- wq_portal %>% 
+      dplyr::filter(variable == "oxygen")
   }
   
   # make a new table and then add each new site onto this
-  if (exists("wq_cleaned_full")) {
-    wq_portal_full <- rbind(wq_cleaned_full, wq_portal)
+  if (exists("wq_portal_full")) {
+    wq_portal_full <- rbind(wq_portal_full, wq_portal)
   } else {
     wq_portal_full <- wq_portal
   }
@@ -152,12 +153,12 @@ wq_avro_files <- paste0(gsub('C:', '', download_location),
                                    recursive = T))
 
 # Read in each of the files and then bind by rows
-wq_avro_df <- map_dfr(.x = wq_avro_files, ~ read.avro.wq(sc= sc, path = .x))
+wq_avro_df <- purrr::map_dfr(.x = wq_avro_files, ~ read.avro.wq(sc= sc, path = .x))
 
 
 # Combine the avro files with the portal data
-wq_full <- bind_rows(wq_portal, wq_avro_df) %>%
-  arrange(site_id, time)
+wq_full <- dplyr::bind_rows(wq_portal, wq_avro_df) %>%
+  dplyr::arrange(site_id, time)
 
 
 #==============================#
@@ -177,39 +178,39 @@ chla_min <- 0
 # outside the ranges specified about
 
 wq_cleaned <- wq_full %>%
-  mutate(observation = ifelse(is.na(observation),
-                          observation, ifelse(observation >= DO_min & observation <= DO_max & variable == 'oxygen', 
-                                    observation, ifelse(observation >= chla_min & observation <= chla_max & variable == 'chla', observation, NA)))) %>%
+  dplyr::mutate(observation = ifelse(is.na(observation),
+                                     observation, ifelse(observation >= DO_min & observation <= DO_max & variable == 'oxygen', 
+                                                         observation, ifelse(observation >= chla_min & observation <= chla_max & variable == 'chla', observation, NA)))) %>%
   # manual cleaning based on visual inspection
-  mutate(observation = ifelse(site_id == "MAYF" & 
-                        between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                        variable == "oxygen", NA, observation),
-         observation = ifelse(site_id == "WLOU" &
-                        !between(observation, 7.5, 11) & 
-                        variable == "oxygen", NA, observation),
-         observation = ifelse(site_id == "BARC" & 
-                        observation < 4 &
-                        variable == "oxygen", NA, observation),
-         
-         error = ifelse(site_id == "MAYF" &
-                       between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                       variable == "oxygen", NA, error),
-         error = ifelse(site_id == "WLOU" &
-                          !between(observation, 7.5, 11) & 
-                          variable == "oxygen", NA, error),
-         error = ifelse(site_id == "BARC" & 
-                          observation < 4 &
-                          variable == "oxygen", NA, error),
-         
-         sd = ifelse(site_id == "MAYF" & 
-                        between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                        variable == "oxygen", NA, sd),
-         sd = ifelse(site_id == "WLOU" &
-                        !between(observation, 7.5, 11) & 
-                        variable == "oxygen", NA, sd),
-         sd = ifelse(site_id == "BARC" & 
-                        observation < 4 &
-                        variable == "oxygen", NA, sd))
+  dplyr::mutate(observation = ifelse(site_id == "MAYF" & 
+                                       between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
+                                       variable == "oxygen", NA, observation),
+                observation = ifelse(site_id == "WLOU" &
+                                       !between(observation, 7.5, 11) & 
+                                       variable == "oxygen", NA, observation),
+                observation = ifelse(site_id == "BARC" & 
+                                       observation < 4 &
+                                       variable == "oxygen", NA, observation),
+                
+                error = ifelse(site_id == "MAYF" &
+                                 between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
+                                 variable == "oxygen", NA, error),
+                error = ifelse(site_id == "WLOU" &
+                                 !between(observation, 7.5, 11) & 
+                                 variable == "oxygen", NA, error),
+                error = ifelse(site_id == "BARC" & 
+                                 observation < 4 &
+                                 variable == "oxygen", NA, error),
+                
+                sd = ifelse(site_id == "MAYF" & 
+                              between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
+                              variable == "oxygen", NA, sd),
+                sd = ifelse(site_id == "WLOU" &
+                              !between(observation, 7.5, 11) & 
+                              variable == "oxygen", NA, sd),
+                sd = ifelse(site_id == "BARC" & 
+                              observation < 4 &
+                              variable == "oxygen", NA, sd))
 
 #===============================================#
 
@@ -223,7 +224,7 @@ temp_bouy <- neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
   dplyr::select(startDateTime, site_id, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert, tsdWaterTempFinalQF, verticalPosition) %>%
   # errors in the sensor depths reported - see "https://www.neonscience.org/impact/observatory-blog/incorrect-depths-associated-lake-and-river-temperature-profiles"
     # sensor depths are manually assigned based on "vertical position" variable as per table on webpage
-  mutate(thermistorDepth = ifelse(site_id == "CRAM" & 
+  dplyr::mutate(thermistorDepth = ifelse(site_id == "CRAM" & 
                                     lubridate::as_date(startDateTime) < lubridate::as_date("2020-11-01") & 
                                     verticalPosition == 502, 1.75, thermistorDepth),
          thermistorDepth = ifelse(site_id == "CRAM" & 
@@ -316,7 +317,7 @@ temp_bouy <- neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
  
 ## river temperatures ##
 temp_prt <- neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
-  rename(site_id = siteID) %>%
+  dplyr::rename(site_id = siteID) %>%
   # horizontal position is upstream or downstream is 101 or 102 horizontal position
   dplyr::filter(horizontalPosition == "101") %>%  # take upstream to match WQ data
   dplyr::select(startDateTime, site_id, surfWaterTempMean, surfWaterTempExpUncert, finalQF) %>%
@@ -366,7 +367,7 @@ tsd_vars <- c('siteName',
              'tsdWaterTempExpUncert',
              'tsdWaterTempFinalQF')
 columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
-thermistor_depths <- read_csv('thermistorDepths.csv', col_types = 'ccd')
+thermistor_depths <- readr::read_csv('thermistorDepths.csv', col_types = 'ccd')
 
 # Generate a list of files to be read
 tsd_avro_files <- paste0(gsub('C:', '', download_location),
@@ -375,7 +376,7 @@ tsd_avro_files <- paste0(gsub('C:', '', download_location),
                                    recursive = T))
 
 # Read in each of the files and then bind by rows
-tsd_avro_df <- map_dfr(.x = tsd_avro_files, ~ read.avro.tsd(sc= sc, path = .x, thermistor_depths = thermistor_depths))
+tsd_avro_df <- purrr::map_dfr(.x = tsd_avro_files, ~ read.avro.tsd(sc= sc, path = .x, thermistor_depths = thermistor_depths))
 
 
 # The variables (term names that should be kept)
@@ -392,12 +393,12 @@ prt_avro_files <- paste0(gsub('C:', '', download_location),
                                     recursive = T))
 
 # Read in each of the files and then bind by rows
-prt_avro_df <- map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc, path = .x))
+prt_avro_df <- purrr::map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc, path = .x))
 
 
 # Combine the avro files with the portal data
-temp_full <- bind_rows(temp_tsd_prt, tsd_avro_df, prt_avro_df) %>%
-  arrange(site_id, time)
+temp_full <- dplyr::bind_rows(temp_tsd_prt, tsd_avro_df, prt_avro_df) %>%
+  dplyr::arrange(site_id, time)
 
 
 #==============================#
@@ -411,27 +412,27 @@ T_min <- -2 # gross min
 # GR flag will be true if the temperature is outside the range specified 
 temp_cleaned <-
   temp_full %>%
-  mutate(observation =ifelse(observation >= T_min & observation <= T_max , 
+  dplyr::mutate(observation =ifelse(observation >= T_min & observation <= T_max , 
                                     observation, NA),
-         sd = ifelse(observation >= T_min & observation <= T_max , 
-                     sd, NA),
-         error = ifelse(observation >= T_min & observation <= T_max , 
-                     error, NA))  %>%
+                sd = ifelse(observation >= T_min & observation <= T_max , 
+                            sd, NA),
+                error = ifelse(observation >= T_min & observation <= T_max , 
+                               error, NA))  %>%
   # manual cleaning based on observationervations
-  mutate(observation = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
-                      NA, observation),
-         sd = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
-                      NA, sd),
-         error = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
-                      NA, error))
+  dplyr:: mutate(observation = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
+                                      NA, observation),
+                 sd = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
+                             NA, sd),
+                 error = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
+                                NA, error))
  
 
 #==============================================
-targets_long <- rbind(wq_cleaned, temp_cleaned) %>%
-  arrange(site_id, time, variable) %>%
-  mutate(observation = ifelse(is.nan(observation), NA, observation),
-         sd = ifelse(is.nan(sd), NA, sd),
-         error = ifelse(is.nan(error), NA, error))
+targets_long <- dplyr::bind_rows(wq_cleaned, temp_cleaned) %>%
+  dplyr::arrange(site_id, time, variable) %>%
+  dplyr::mutate(observation = ifelse(is.nan(observation), NA, observation),
+                sd = ifelse(is.nan(sd), NA, sd),
+                error = ifelse(is.nan(error), NA, error))
 
 ### Write out the targets
 write_csv(targets_long, "aquatics-targets.csv.gz")
