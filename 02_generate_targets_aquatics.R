@@ -369,7 +369,10 @@ temp_cleaned <-
 #   facet_grid(variable~site_ID, scales = "free")
 
 targets_long <- rbind(wq_cleaned, temp_cleaned) %>%
-  arrange(site_ID, time, variable)
+  arrange(site_ID, time, variable) %>%
+  mutate(obs = ifelse(is.nan(obs), NA, obs),
+         sd = ifelse(is.nan(sd), NA, sd),
+         error = ifelse(is.nan(error), NA, error))
 
 ### Write out the targets
 write_csv(targets_long, "aquatics-targets.csv.gz")
