@@ -13,6 +13,7 @@ library(contentid)
 library(sparklyr)
 library(sparkavro)
 source('R/avro_functions.R')
+# spark_install(version = '3.0')
 
 `%!in%` <- Negate(`%in%`) # not in function
 
@@ -72,14 +73,14 @@ for (i in 1:length(sites$field_site_id)) {
                      sensorDepth = mean(sensorDepth, na.rm = TRUE),
                      chla_observation = mean(chla, na.rm = TRUE),
                      
-                     oxygen_sd = sd(dissolvedOxygen, na.rm = TRUE),
-                     chla_sd = sd(chla, na.rm = TRUE),
+                     oxygen_sample.sd = sd(dissolvedOxygen, na.rm = TRUE),
+                     chla_sample.sd = sd(chla, na.rm = TRUE),
                      #why only using the count of non-NA in DO?
                      count = sum(!is.na(dissolvedOxygen)),
-                     chla_error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
-                     oxygen_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
+                     chla_measure.error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
+                     oxygen_measure.error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
     #dplyr::filter(count > 44) %>% 
-    dplyr::select(time, site_id, oxygen_observation, chla_observation,oxygen_sd, chla_sd, oxygen_error, chla_error) %>% 
+    dplyr::select(time, site_id, oxygen_observation, chla_observation,oxygen_sample.sd, chla_sample.sd, oxygen_measure.error, chla_measure.error) %>% 
     
     
     
@@ -192,25 +193,25 @@ wq_cleaned <- wq_full %>%
                                        observation < 4 &
                                        variable == "oxygen", NA, observation),
                 
-                error = ifelse(site_id == "MAYF" &
+                measure.error = ifelse(site_id == "MAYF" &
                                  between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                                 variable == "oxygen", NA, error),
-                error = ifelse(site_id == "WLOU" &
+                                 variable == "oxygen", NA, measure.error),
+                measure.error = ifelse(site_id == "WLOU" &
                                  !between(observation, 7.5, 11) & 
-                                 variable == "oxygen", NA, error),
-                error = ifelse(site_id == "BARC" & 
+                                 variable == "oxygen", NA, measure.error),
+                measure.error = ifelse(site_id == "BARC" & 
                                  observation < 4 &
-                                 variable == "oxygen", NA, error),
+                                 variable == "oxygen", NA, measure.error),
                 
-                sd = ifelse(site_id == "MAYF" & 
+                sample.sd = ifelse(site_id == "MAYF" & 
                               between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                              variable == "oxygen", NA, sd),
-                sd = ifelse(site_id == "WLOU" &
+                              variable == "oxygen", NA, sample.sd),
+                sample.sd = ifelse(site_id == "WLOU" &
                               !between(observation, 7.5, 11) & 
-                              variable == "oxygen", NA, sd),
-                sd = ifelse(site_id == "BARC" & 
+                              variable == "oxygen", NA, sample.sd),
+                sample.sd = ifelse(site_id == "BARC" & 
                               observation < 4 &
-                              variable == "oxygen", NA, sd))
+                              variable == "oxygen", NA, sample.sd))
 
 #===============================================#
 
@@ -309,10 +310,10 @@ temp_bouy <- neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
   dplyr::group_by(time, site_id) %>% # use all the depths
   dplyr::summarize(temperature_observation = mean(tsdWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(tsdWaterTempMean)),
-                   temperature_sd = sd(tsdWaterTempMean, na.rm = T),
-                   temperature_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
+                   temperature_sample.sd = sd(tsdWaterTempMean, na.rm = T),
+                   temperature_measure.error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>%  
-  dplyr::select(time, site_id, temperature_observation, temperature_sd, temperature_error) 
+  dplyr::select(time, site_id, temperature_observation, temperature_sample.sd, temperature_measure.error) 
 
  
 ## river temperatures ##
@@ -326,10 +327,10 @@ temp_prt <- neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
   dplyr::group_by(time, site_id) %>%
   dplyr::summarize(temperature_observation = mean(surfWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(surfWaterTempMean)),
-                   temperature_sd = sd(surfWaterTempMean),
-                   temperature_error = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
+                   temperature_sample.sd = sd(surfWaterTempMean),
+                   temperature_measure.error = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>% 
-  dplyr::select(time, site_id, temperature_observation, temperature_sd, temperature_error) 
+  dplyr::select(time, site_id, temperature_observation, temperature_sample.sd, temperature_measure.error) 
 
 temp_tsd_prt <- rbind(temp_bouy, temp_prt) %>%
   pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "_") %>%
@@ -414,25 +415,25 @@ temp_cleaned <-
   temp_full %>%
   dplyr::mutate(observation =ifelse(observation >= T_min & observation <= T_max , 
                                     observation, NA),
-                sd = ifelse(observation >= T_min & observation <= T_max , 
-                            sd, NA),
-                error = ifelse(observation >= T_min & observation <= T_max , 
-                               error, NA))  %>%
+                sample.sd = ifelse(observation >= T_min & observation <= T_max , 
+                            sample.sd, NA),
+                measure.error = ifelse(observation >= T_min & observation <= T_max , 
+                               measure.error, NA))  %>%
   # manual cleaning based on observationervations
   dplyr:: mutate(observation = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
                                       NA, observation),
-                 sd = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
-                             NA, sd),
-                 error = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
-                                NA, error))
+                 sample.sd = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
+                             NA, sample.sd),
+                 measure.error = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
+                                NA, measure.error))
  
 
 #==============================================
 targets_long <- dplyr::bind_rows(wq_cleaned, temp_cleaned) %>%
   dplyr::arrange(site_id, time, variable) %>%
   dplyr::mutate(observation = ifelse(is.nan(observation), NA, observation),
-                sd = ifelse(is.nan(sd), NA, sd),
-                error = ifelse(is.nan(error), NA, error))
+                sample.sd = ifelse(is.nan(sample.sd), NA, sample.sd),
+                measure.error = ifelse(is.nan(measure.error), NA, measure.error))
 
 ### Write out the targets
 write_csv(targets_long, "aquatics-targets.csv.gz")
