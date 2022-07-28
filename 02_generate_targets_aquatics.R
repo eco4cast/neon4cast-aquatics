@@ -148,8 +148,8 @@ wq_vars <- c('siteName',
 columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
 
 # Generate a list of files to be read
-wq_avro_files <- paste0(gsub('C:', '', download_location),
-                        list.files(path = download_location, 
+wq_avro_files <- paste0(gsub('C:', '', download_location), 'neon_avro/',
+                        list.files(path = paste0(download_location, 'neon_avro/'), 
                                    pattern = '*20288', 
                                    recursive = T))
 
@@ -356,6 +356,11 @@ download.neon.avro(months = new_month_wq,
                    data_product = '20264',  # WQ data product
                    path = download_location)
 
+download.neon.avro(months = new_month_wq, 
+                   sites = unique(sites$field_site_id), 
+                   data_product = '20053',  # WQ data product
+                   path = download_location)
+
 # Read in the new files to append to the NEONstore data
 # connect to spark locally 
 sc <- sparklyr::spark_connect(master = "local")
@@ -368,13 +373,13 @@ tsd_vars <- c('siteName',
              'tsdWaterTempExpUncert',
              'tsdWaterTempFinalQF')
 columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
-thermistor_depths <- readr::read_csv('thermistorDepths.csv', col_types = 'ccd')
+thermistor_depths <- readr::read_csv('https://raw.githubusercontent.com/OlssonF/neon4cast-aquatics/master/thermistorDepths.csv', col_types = 'ccd')
 
 # Generate a list of files to be read
-tsd_avro_files <- paste0(gsub('C:', '', download_location),
-                        list.files(path = download_location, 
-                                   pattern = '*20264', 
-                                   recursive = T))
+tsd_avro_files <- paste0(gsub('C:', '', download_location), 'neon_avro/',
+                         list.files(path = paste0(download_location, 'neon_avro/'),
+                                    pattern = '*20264', 
+                                    recursive = T))
 
 # Read in each of the files and then bind by rows
 tsd_avro_df <- purrr::map_dfr(.x = tsd_avro_files, ~ read.avro.tsd(sc= sc, path = .x, thermistor_depths = thermistor_depths))
@@ -388,8 +393,8 @@ prt_vars <- c('siteName',
               'finalQF')
 
 # Generate a list of files to be read
-prt_avro_files <- paste0(gsub('C:', '', download_location),
-                         list.files(path = download_location, 
+prt_avro_files <- paste0(gsub('C:', '', download_location), 'neon_avro/',
+                         list.files(path = paste0(download_location, 'neon_avro/'),
                                     pattern = '*20053', 
                                     recursive = T))
 
