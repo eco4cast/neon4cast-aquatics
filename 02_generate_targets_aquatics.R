@@ -12,7 +12,7 @@ library(lubridate)
 library(contentid)
 library(sparklyr)
 library(sparkavro)
-source('R/avro functions.R')
+source('R/avro_functions.R')
 
 `%!in%` <- Negate(`%in%`) # not in function
 
