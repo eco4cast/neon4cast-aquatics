@@ -2,10 +2,10 @@
 download.neon.avro <- function(months, sites, data_product, path) {
   for (i in 1:length(sites)) {
     # create a directory for each site (if one doesn't already exist)
-    if (paste0('site=', sites[i]) %in% list.dirs(path, full.names = F)) {
+    if (paste0('neon_avro/site=', sites[i]) %in% list.dirs(path, full.names = F)) {
       # message('directory exists')
     } else {
-      dir.create(path = paste0(path, 'site=', sites[i]))
+      dir.create(path = paste0(path, 'neon_avro/site=', sites[i]), recursive = TRUE)
       message('creating new directory')
     }
     
@@ -26,7 +26,7 @@ download.neon.avro <- function(months, sites, data_product, path) {
                       sites[i],
                       "/* ",
                       path,
-                      'site=',
+                      'neon_avro/site=',
                       sites[i]),
                ignore.stderr = T)
         
@@ -42,11 +42,11 @@ download.neon.avro <- function(months, sites, data_product, path) {
 # delete the superseded files
 delete.neon.avro <- function(months, sites, path) {
   for (i in 1:length(sites)) {
-    superseded <-  dir(path = paste0(path, 'site=', sites[i]),
+    superseded <-  dir(path = paste0(path, 'neon_avro/site=', sites[i]),
                        pattern = months)
     
     if (length(superseded) != 0) {
-      file.remove(paste0(path,'site=', sites[i], '/',superseded))
+      file.remove(paste0(path,'neon_avro/site=', sites[i], '/',superseded))
     }
   }
 }
@@ -87,11 +87,11 @@ read.avro.wq <- function(sc, name = 'name', path) {
         group_by(siteName, time) %>%
         summarize(oxygen_observation = mean(dissolvedOxygen, na.rm = TRUE),
                   chla_observation = mean(chlorophyll, na.rm = TRUE),
-                  oxygen_sd = sd(dissolvedOxygen, na.rm = TRUE),
-                  chla_sd = sd(chlorophyll, na.rm = TRUE),
+                  oxygen_sample.sd = sd(dissolvedOxygen, na.rm = TRUE),
+                  chla_sample.sd = sd(chlorophyll, na.rm = TRUE),
                   count = sum(!is.na(dissolvedOxygen)),
-                  chla_error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
-                  oxygen_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
+                  chla_measure.error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
+                  oxygen_measure.error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
         # get in the same long format as the NEON portal data
@@ -166,8 +166,8 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
         group_by(siteName, time) %>%
         summarize(temperature_observation = mean(tsdWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(tsdWaterTempMean)),
-                  temperature_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
-                  temperature_sd = sd(tsdWaterTempMean, na.rm = TRUE),
+                  temperature_measure.error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
+                  temperature_sample.sd = sd(tsdWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
@@ -230,8 +230,8 @@ read.avro.prt <- function(sc, name = 'name', path) {
         group_by(siteName, time) %>%
         summarize(temperature_observation = mean(surfWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(surfWaterTempMean)),
-                  temperature_error = mean(surfWaterTempMean, na.rm = TRUE) / sqrt(count),
-                  temperature_sd = sd(surfWaterTempMean, na.rm = TRUE),
+                  temperature_measure.error = mean(surfWaterTempMean, na.rm = TRUE) / sqrt(count),
+                  temperature_sample.sd = sd(surfWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
