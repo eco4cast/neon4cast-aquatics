@@ -85,8 +85,8 @@ read.avro.wq <- function(sc, name = 'name', path) {
                chlorophyll = ifelse('chlorophyll' %in% colnames(wq_tibble_wider), chlorophyll, NA),
                chlorophyllExpUncert = ifelse('chlorophyll' %in% colnames(wq_tibble_wider),chlorophyllExpUncert,NA)) %>%
         group_by(siteName, time) %>%
-        summarize(oxygen_obs = mean(dissolvedOxygen, na.rm = TRUE),
-                  chla_obs = mean(chlorophyll, na.rm = TRUE),
+        summarize(oxygen_observation = mean(dissolvedOxygen, na.rm = TRUE),
+                  chla_observation = mean(chlorophyll, na.rm = TRUE),
                   oxygen_sd = sd(dissolvedOxygen, na.rm = TRUE),
                   chla_sd = sd(chlorophyll, na.rm = TRUE),
                   count = sum(!is.na(dissolvedOxygen)),
@@ -103,19 +103,21 @@ read.avro.wq <- function(sc, name = 'name', path) {
     } 
   }
   
-  if (unique(daily_wq$site_id) %in% stream_sites) {
-    daily_wq <- daily_wq %>% filter(variable == "oxygen")
+  if (exists('daily_wq')) {
+    if (unique(daily_wq$site_id) %in% stream_sites) {
+      daily_wq <- daily_wq %>% filter(variable == "oxygen")
+    }
   }
   
   if (exists('daily_wq')) {
     return(daily_wq)
   } else {
       # create an empty df to return
-      empty <- data.frame(site_id = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
+      empty <- data.frame(site_id = NA, time = NA, variable = NA, observation = NA, error = NA)  %>%
         mutate(site_id = as.character(site_id),
                time = as.Date(time),
                variable = as.character(variable),
-               obs = as.numeric(obs),
+               observation = as.numeric(observation),
                error = as.numeric(error)) %>%
         filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
       return(empty)
@@ -162,7 +164,7 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
         # tsdWaterTempExpUncert = ifelse('tsdWaterTempExpUncert' %in% colnames(tsd_tibble_wider),
         #                                tsdWaterTempExpUncert, NA)) %>%
         group_by(siteName, time) %>%
-        summarize(temperature_obs = mean(tsdWaterTempMean, na.rm = TRUE),
+        summarize(temperature_observation = mean(tsdWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(tsdWaterTempMean)),
                   temperature_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
                   temperature_sd = sd(tsdWaterTempMean, na.rm = TRUE),
@@ -182,11 +184,11 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
     return(daily_tsd)
   } else {
     # create an empty df to return
-    empty <- data.frame(site_id = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
+    empty <- data.frame(site_id = NA, time = NA, variable = NA, observation = NA, error = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
-             obs = as.numeric(obs),
+             observation = as.numeric(observation),
              error = as.numeric(error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
@@ -226,7 +228,7 @@ read.avro.prt <- function(sc, name = 'name', path) {
       daily_prt <- prt_tibble_wider  %>%
         mutate(time = as.Date(startDate)) %>%
         group_by(siteName, time) %>%
-        summarize(temperature_obs = mean(surfWaterTempMean, na.rm = TRUE),
+        summarize(temperature_observation = mean(surfWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(surfWaterTempMean)),
                   temperature_error = mean(surfWaterTempMean, na.rm = TRUE) / sqrt(count),
                   temperature_sd = sd(surfWaterTempMean, na.rm = TRUE),
@@ -246,11 +248,11 @@ read.avro.prt <- function(sc, name = 'name', path) {
     return(daily_prt)
   } else {
     # create an empty df to return
-    empty <- data.frame(site_id = NA, time = NA, variable = NA, obs = NA, error = NA)  %>%
+    empty <- data.frame(site_id = NA, time = NA, variable = NA, observation = NA, error = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
-             obs = as.numeric(obs),
+             observation = as.numeric(observation),
              error = as.numeric(error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
