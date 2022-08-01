@@ -1,7 +1,12 @@
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
-Sys.setenv("NEONSTORE_HOME" = "/efi_neon_challenge/neonstore")
-Sys.setenv("NEONSTORE_DB" = "/efi_neon_challenge/neonstore")
+avro_file_directory <- "/home/rstudio/data/aquatic_avro"
+Sys.setenv("NEONSTORE_HOME" = "/home/rstudio/data/neonstore") #Sys.setenv("NEONSTORE_HOME" = "/efi_neon_challenge/neonstore")
+#Sys.setenv("NEONSTORE_DB" = "home/rstudio/data/neonstore")    #Sys.setenv("NEONSTORE_DB" = "/efi_neon_challenge/neonstore")
+
+Sys.unsetenv("AWS_DEFAULT_REGION")
+Sys.unsetenv("AWS_S3_ENDPOINT")
+Sys.setenv("AWS_EC2_METADATA_DISABLED"="TRUE")
 
 Sys.setenv(TZ = 'UTC')
 ## 02_generate_targets_aquatics
@@ -27,15 +32,15 @@ stream_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Wadeable
 
 #======================================================#
 
-message("Downloading: DP1.20288.001")
-neonstore::neon_download("DP1.20288.001",site = sites$field_site_id, type = "basic")
-neonstore::neon_store(table = "waq_instantaneous", n = 50)
-message("Downloading: DP1.20264.001")
-neonstore::neon_download("DP1.20264.001", site =  sites$field_site_id, type = "basic")
-neonstore::neon_store(table = "TSD_30_min")
-message("Downloading: DP1.20053.001")
-neonstore::neon_download("DP1.20053.001", site =  sites$field_site_id, type = "basic")
-neonstore::neon_store(table = "TSW_30min")
+#message("Downloading: DP1.20288.001")
+#neonstore::neon_download("DP1.20288.001",site = sites$field_site_id, type = "basic")
+#neonstore::neon_store(table = "waq_instantaneous", n = 50)
+#message("Downloading: DP1.20264.001")
+#neonstore::neon_download("DP1.20264.001", site =  sites$field_site_id, type = "basic")
+#neonstore::neon_store(table = "TSD_30_min")
+#message("Downloading: DP1.20053.001")
+#neonstore::neon_download("DP1.20053.001", site =  sites$field_site_id, type = "basic")
+#neonstore::neon_store(table = "TSW_30min")
 
 ## Load data from raw files
 # message("neon_table(table = 'waq_instantaneous')")
@@ -47,73 +52,66 @@ neonstore::neon_store(table = "TSW_30min")
 
 
 #### Generate WQ table #############
-for (i in 1:length(sites$field_site_id)) {
-  wq_portal <- neonstore::neon_table(table = "waq_instantaneous", site = sites$field_site_id[i]) %>% #wq_raw %>% 
-    dplyr::select(siteID, startDateTime, sensorDepth,
-                  dissolvedOxygen,dissolvedOxygenExpUncert,dissolvedOxygenFinalQF, 
-                  chlorophyll, chlorophyllExpUncert,chlorophyllFinalQF) %>%
-    dplyr::mutate(sensorDepth = as.numeric(sensorDepth),
-                  dissolvedOxygen = as.numeric(dissolvedOxygen),
-                  dissolvedOxygenExpUncert = as.numeric(dissolvedOxygenExpUncert),
-                  chla = as.numeric(chlorophyll),
-                  chlorophyllExpUncert = as.numeric(chlorophyllExpUncert)) %>%
-    rename(site_id = siteID) %>% 
-    
-    # sensor depth of NA == surface?
-    dplyr::filter(((sensorDepth > 0 & sensorDepth < 1)| is.na(sensorDepth))) %>%
-    dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
-    dplyr::mutate(time = as_date(startDateTime)) %>%
-    
-    # QF (quality flag) == 0, is a pass (1 == fail), 
-    # make NA so these values are not used in the mean summary
-    dplyr::mutate(dissolvedOxygen = ifelse(dissolvedOxygenFinalQF == 0, dissolvedOxygen, NA),
-                  chla = ifelse(chlorophyllFinalQF == 0, chla, NA)) %>% 
-    dplyr::group_by(site_id, time) %>%
-    dplyr::summarize(oxygen_observation = mean(dissolvedOxygen, na.rm = TRUE),
-                     sensorDepth = mean(sensorDepth, na.rm = TRUE),
-                     chla_observation = mean(chla, na.rm = TRUE),
-                     
-                     oxygen_sample.sd = sd(dissolvedOxygen, na.rm = TRUE),
-                     chla_sample.sd = sd(chla, na.rm = TRUE),
-                     #why only using the count of non-NA in DO?
-                     count = sum(!is.na(dissolvedOxygen)),
-                     chla_measure.error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
-                     oxygen_measure.error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
-    #dplyr::filter(count > 44) %>% 
-    dplyr::select(time, site_id, oxygen_observation, chla_observation,oxygen_sample.sd, chla_sample.sd, oxygen_measure.error, chla_measure.error) %>% 
-    
-    
-    
-    pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "_") %>%
-    pivot_wider(names_from = stat, values_from = value)
+neon <- arrow::s3_bucket("neon4cast-targets/neon",
+                           endpoint_override = "data.ecoforecast.org",
+                           anonymous = TRUE)
+# list tables with `neon$ls()`
+wq_portal <- arrow::open_dataset(neon$path("waq_instantaneous-basic-DP1.20288.001")) %>%   # waq_instantaneous
+  dplyr::filter(siteID %in% sites$field_site_id) %>%
+  dplyr::select(siteID, startDateTime, sensorDepth,
+                dissolvedOxygen,dissolvedOxygenExpUncert,dissolvedOxygenFinalQF, 
+                chlorophyll, chlorophyllExpUncert,chlorophyllFinalQF) %>%
+  dplyr::mutate(sensorDepth = as.numeric(sensorDepth),
+                dissolvedOxygen = as.numeric(dissolvedOxygen),
+                dissolvedOxygenExpUncert = as.numeric(dissolvedOxygenExpUncert),
+                chla = as.numeric(chlorophyll),
+                chlorophyllExpUncert = as.numeric(chlorophyllExpUncert)) %>%
+  rename(site_id = siteID) %>% 
+  dplyr::collect()
+wq_portal <- wq_portal %>% # sensor depth of NA == surface?
+  dplyr::filter(((sensorDepth > 0 & sensorDepth < 1)| is.na(sensorDepth))) %>%
+  dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
+  dplyr::mutate(time = as_date(startDateTime)) %>%
   
-  # if its a stream site we don't want the chlorophyll
-  if (unique(wq_portal$site_id) %in% stream_sites) {
-    wq_portal <- wq_portal %>% 
-      dplyr::filter(variable == "oxygen")
-  }
+  # QF (quality flag) == 0, is a pass (1 == fail), 
+  # make NA so these values are not used in the mean summary
+  dplyr::mutate(dissolvedOxygen = ifelse(dissolvedOxygenFinalQF == 0, dissolvedOxygen, NA),
+                chla = ifelse(chlorophyllFinalQF == 0, chla, NA)) %>% 
+  dplyr::group_by(site_id, time) %>%
+  dplyr::summarize(oxygen_observation = mean(dissolvedOxygen, na.rm = TRUE),
+                   sensorDepth = mean(sensorDepth, na.rm = TRUE),
+                   chla_observation = mean(chla, na.rm = TRUE),
+                   
+                   oxygen_sample.sd = sd(dissolvedOxygen, na.rm = TRUE),
+                   chla_sample.sd = sd(chla, na.rm = TRUE),
+                   #why only using the count of non-NA in DO?
+                   count = sum(!is.na(dissolvedOxygen)),
+                   chla_measure.error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
+                   oxygen_measure.error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
+  #dplyr::filter(count > 44) %>% 
+  dplyr::select(time, site_id, oxygen_observation, chla_observation,oxygen_sample.sd, chla_sample.sd, oxygen_measure.error, chla_measure.error) %>% 
   
-  # make a new table and then add each new site onto this
-  if (exists("wq_portal_full")) {
-    wq_portal_full <- rbind(wq_portal_full, wq_portal)
-  } else {
-    wq_portal_full <- wq_portal
-  }
-  print(paste0(i, "/", length(sites$field_site_id)))
-}
+  
+  
+  pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "_") %>%
+  pivot_wider(names_from = stat, values_from = value) %>%
+  filter(!(variable == "chla" & site_id %in% stream_sites))
+  
 #====================================================#
 
 # ======= low latency WQ data =======
 # download the 24/48hr provisional data from the Google Cloud
 
 # where should these files be saved?
-download_location <- 'C:/Users/freya/Downloads/'
+
+download_location <- avro_file_directory
+fs::dir_create(download_location)
 
 # need to figure out which month's data are required
 # what is in the NEON store db?
-cur_wq_month <- format(as.Date(max(wq_portal_full$time)), "%Y-%m")
+cur_wq_month <- format(as.Date(max(wq_portal$time)), "%Y-%m")
 # what is the next month from this plus the current month? These might be the same
-new_month_wq <- unique(format(c((as.Date(max(wq_portal_full$time)) %m+% months(1)), Sys.Date()), "%Y-%m"))
+new_month_wq <- unique(format(c((as.Date(max(wq_portal$time)) %m+% months(1)), (Sys.Date() - days(2))), "%Y-%m"))
 
 
 # Start by deleting superseded files
@@ -128,7 +126,7 @@ delete.neon.avro(months = cur_wq_month,
 
 # Download any new files from the Google Cloud
 download.neon.avro(months = new_month_wq, 
-                   sites = unique(sites$field_site_id), 
+                   sites = unique(wq_portal$site_id), #unique(sites$field_site_id), 
                    data_product = '20288',  # WQ data product
                    path = download_location)
 
@@ -220,9 +218,13 @@ wq_cleaned <- wq_full %>%
   # "raw data" (L1 NEON data product) is the 30 min average taken from 1 min measurements
 
 ## lake temperatures ##
-temp_bouy <- neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
+temp_buoy <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP1.20264.001")) %>%
+  # neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
   rename(site_id = siteID) %>%
   dplyr::select(startDateTime, site_id, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert, tsdWaterTempFinalQF, verticalPosition) %>%
+  dplyr::collect()
+
+temp_buoy <- temp_buoy %>%
   # errors in the sensor depths reported - see "https://www.neonscience.org/impact/observatory-blog/incorrect-depths-associated-lake-and-river-temperature-profiles"
     # sensor depths are manually assigned based on "vertical position" variable as per table on webpage
   dplyr::mutate(thermistorDepth = ifelse(site_id == "CRAM" & 
@@ -314,15 +316,18 @@ temp_bouy <- neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
                    temperature_measure.error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>%  
   dplyr::select(time, site_id, temperature_observation, temperature_sample.sd, temperature_measure.error) 
-
  
 ## river temperatures ##
-temp_prt <- neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
+temp_prt <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
+  # neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
   dplyr::rename(site_id = siteID) %>%
   # horizontal position is upstream or downstream is 101 or 102 horizontal position
   dplyr::filter(horizontalPosition == "101") %>%  # take upstream to match WQ data
   dplyr::select(startDateTime, site_id, surfWaterTempMean, surfWaterTempExpUncert, finalQF) %>%
-  dplyr::filter(finalQF == 0) %>% 
+  dplyr::filter(finalQF == 0) %>%
+  dplyr::collect()
+
+temp_prt <- temp_prt %>%
   dplyr::mutate(time = as_date(startDateTime)) %>% 
   dplyr::group_by(time, site_id) %>%
   dplyr::summarize(temperature_observation = mean(surfWaterTempMean, na.rm = TRUE),
@@ -332,7 +337,7 @@ temp_prt <- neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
   #dplyr::filter(count > 44) %>% 
   dplyr::select(time, site_id, temperature_observation, temperature_sample.sd, temperature_measure.error) 
 
-temp_tsd_prt <- rbind(temp_bouy, temp_prt) %>%
+temp_tsd_prt <- rbind(temp_buoy, temp_prt) %>%
   pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "_") %>%
   pivot_wider(names_from = stat, values_from = value)
 
@@ -346,18 +351,18 @@ temp_tsd_prt <- rbind(temp_bouy, temp_prt) %>%
 # store data
 
 delete.neon.avro(months = cur_wq_month,
-                 sites = unique(sites$field_site_id), 
+                 sites = unique(temp_bouy$site_id),# unique(sites$field_site_id),
                  path = download_location)
 
 
 # Download any new files from the Google Cloud
 download.neon.avro(months = new_month_wq, 
-                   sites = unique(sites$field_site_id), 
+                   sites = unique(temp_bouy$site_id),# unique(sites$field_site_id), 
                    data_product = '20264',  # WQ data product
                    path = download_location)
 
 download.neon.avro(months = new_month_wq, 
-                   sites = unique(sites$field_site_id), 
+                   sites = unique(temp_bouy$site_id)[1],# unique(sites$field_site_id), 
                    data_product = '20053',  # WQ data product
                    path = download_location)
 
@@ -443,12 +448,13 @@ targets_long <- dplyr::bind_rows(wq_cleaned, temp_cleaned) %>%
 ### Write out the targets
 write_csv(targets_long, "aquatics-targets.csv.gz")
 
+readRenviron("~/.Renviron") # compatible with littler
 ## Publish the targets to EFI.  Assumes aws.s3 env vars are configured.
-source("../neon4cast-shared-utilities/publish.R")
+source("../challenge-ci/publish.R")
 publish(code = "02_generate_targets_aquatics.R",
         data_out = "aquatics-targets.csv.gz",
         prefix = "aquatics/",
-        bucket = "targets",
+        bucket = "neon4cast-targets",
         provdb = "prov.tsv",
         registries = "https://hash-archive.carlboettiger.info")
 
