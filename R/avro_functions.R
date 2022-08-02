@@ -87,11 +87,11 @@ read.avro.wq <- function(sc, name = 'name', path) {
         group_by(siteName, time) %>%
         summarize(oxygen_observation = mean(dissolvedOxygen, na.rm = TRUE),
                   chla_observation = mean(chlorophyll, na.rm = TRUE),
-                  oxygen_sample.sd = sd(dissolvedOxygen, na.rm = TRUE),
-                  chla_sample.sd = sd(chlorophyll, na.rm = TRUE),
+                  oxygen_sample_sd = sd(dissolvedOxygen, na.rm = TRUE),
+                  chla_sample_sd = sd(chlorophyll, na.rm = TRUE),
                   count = sum(!is.na(dissolvedOxygen)),
-                  chla_measure.error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
-                  oxygen_measure.error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
+                  chla_measure_error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
+                  oxygen_measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
         # get in the same long format as the NEON portal data
@@ -166,8 +166,8 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
         group_by(siteName, time) %>%
         summarize(temperature_observation = mean(tsdWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(tsdWaterTempMean)),
-                  temperature_measure.error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
-                  temperature_sample.sd = sd(tsdWaterTempMean, na.rm = TRUE),
+                  temperature_measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
+                  temperature_sample_sd = sd(tsdWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
@@ -230,8 +230,8 @@ read.avro.prt <- function(sc, name = 'name', path) {
         group_by(siteName, time) %>%
         summarize(temperature_observation = mean(surfWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(surfWaterTempMean)),
-                  temperature_measure.error = mean(surfWaterTempMean, na.rm = TRUE) / sqrt(count),
-                  temperature_sample.sd = sd(surfWaterTempMean, na.rm = TRUE),
+                  temperature_measure_error = mean(surfWaterTempMean, na.rm = TRUE) / sqrt(count),
+                  temperature_sample_sd = sd(surfWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
