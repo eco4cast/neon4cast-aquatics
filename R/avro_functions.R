@@ -230,7 +230,7 @@ read.avro.prt <- function(sc, name = 'name', path) {
         group_by(siteName, time) %>%
         summarize(temperature_observation = mean(surfWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(surfWaterTempMean)),
-                  temperature_measure_error = mean(surfWaterTempMean, na.rm = TRUE) / sqrt(count),
+                  temperature_measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
                   temperature_sample_sd = sd(surfWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
