@@ -132,7 +132,7 @@ download.neon.avro(months = new_month_wq,
 
 # Read in the new files to append to the NEONstore data
 # connect to spark locally 
-sc <- sparklyr::spark_connect(master = "local")
+sc <- sparklyr::spark_connect(master = "local", version = '3.0', )
 
 # The variables (term names that should be kept)
 wq_vars <- c('siteName',
@@ -146,8 +146,8 @@ wq_vars <- c('siteName',
 columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
 
 # Generate a list of files to be read
-wq_avro_files <- paste0(gsub('C:', '', download_location), 'neon_avro/',
-                        list.files(path = paste0(download_location, 'neon_avro/'), 
+wq_avro_files <- paste0(download_location, '/',
+                        list.files(path = paste0(download_location), 
                                    pattern = '*20288', 
                                    recursive = T))
 
@@ -357,12 +357,12 @@ delete.neon.avro(months = cur_wq_month,
 
 # Download any new files from the Google Cloud
 download.neon.avro(months = new_month_wq, 
-                   sites = unique(temp_bouy$site_id),# unique(sites$field_site_id), 
+                   sites = unique(sites$field_site_id), 
                    data_product = '20264',  # WQ data product
                    path = download_location)
 
 download.neon.avro(months = new_month_wq, 
-                   sites = unique(temp_bouy$site_id)[1],# unique(sites$field_site_id), 
+                   sites = unique(sites$field_site_id), 
                    data_product = '20053',  # WQ data product
                    path = download_location)
 
@@ -381,8 +381,8 @@ columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
 thermistor_depths <- readr::read_csv('https://raw.githubusercontent.com/OlssonF/neon4cast-aquatics/master/thermistorDepths.csv', col_types = 'ccd')
 
 # Generate a list of files to be read
-tsd_avro_files <- paste0(gsub('C:', '', download_location), 'neon_avro/',
-                         list.files(path = paste0(download_location, 'neon_avro/'),
+tsd_avro_files <- paste0(download_location, '/',
+                         list.files(path = download_location,
                                     pattern = '*20264', 
                                     recursive = T))
 
@@ -398,8 +398,8 @@ prt_vars <- c('siteName',
               'finalQF')
 
 # Generate a list of files to be read
-prt_avro_files <- paste0(gsub('C:', '', download_location), 'neon_avro/',
-                         list.files(path = paste0(download_location, 'neon_avro/'),
+prt_avro_files <- paste0(download_location, '/',
+                         list.files(path = download_location,
                                     pattern = '*20053', 
                                     recursive = T))
 

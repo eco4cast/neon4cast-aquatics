@@ -2,10 +2,10 @@
 download.neon.avro <- function(months, sites, data_product, path) {
   for (i in 1:length(sites)) {
     # create a directory for each site (if one doesn't already exist)
-    if (paste0('neon_avro/site=', sites[i]) %in% list.dirs(path, full.names = F)) {
+    if (paste0('site=', sites[i]) %in% list.dirs(path, full.names = F)) {
       # message('directory exists')
     } else {
-      dir.create(path = paste0(path, 'neon_avro/site=', sites[i]), recursive = TRUE)
+      dir.create(path = paste0(path, '/site=', sites[i]), recursive = TRUE)
       message('creating new directory')
     }
     
@@ -16,7 +16,7 @@ download.neon.avro <- function(months, sites, data_product, path) {
       for (dp in data_product) {
         # download the provisional files from Google Cloud Storage using the gsutils tool from cmd
         # -n argument skips files already downloaded
-        system(paste0('gsutil -m cp -n gs://neon-is-transition-output/provisional/dpid=DP1.',
+        system(paste0('~/google-cloud-sdk/bin/gsutil -m cp -n gs://neon-is-transition-output/provisional/dpid=DP1.',
                       dp,
                       '.001/ms=',
                       # -n excludes already downloaded files
@@ -26,7 +26,7 @@ download.neon.avro <- function(months, sites, data_product, path) {
                       sites[i],
                       "/* ",
                       path,
-                      'neon_avro/site=',
+                      '/site=',
                       sites[i]),
                ignore.stderr = T)
         
@@ -42,11 +42,11 @@ download.neon.avro <- function(months, sites, data_product, path) {
 # delete the superseded files
 delete.neon.avro <- function(months, sites, path) {
   for (i in 1:length(sites)) {
-    superseded <-  dir(path = paste0(path, 'neon_avro/site=', sites[i]),
+    superseded <-  dir(path = paste0(path, 'aquatic_avro/site=', sites[i]),
                        pattern = months)
     
     if (length(superseded) != 0) {
-      file.remove(paste0(path,'neon_avro/site=', sites[i], '/',superseded))
+      file.remove(paste0(path,'aquatic_avro/site=', sites[i], '/',superseded))
     }
   }
 }
