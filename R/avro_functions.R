@@ -85,19 +85,19 @@ read.avro.wq <- function(sc, name = 'name', path) {
                chlorophyll = ifelse('chlorophyll' %in% colnames(wq_tibble_wider), chlorophyll, NA),
                chlorophyllExpUncert = ifelse('chlorophyll' %in% colnames(wq_tibble_wider),chlorophyllExpUncert,NA)) %>%
         group_by(siteName, time) %>%
-        summarize(oxygen_observation = mean(dissolvedOxygen, na.rm = TRUE),
-                  chla_observation = mean(chlorophyll, na.rm = TRUE),
-                  oxygen_sample_sd = sd(dissolvedOxygen, na.rm = TRUE),
-                  chla_sample_sd = sd(chlorophyll, na.rm = TRUE),
+        summarize(oxygen__observation = mean(dissolvedOxygen, na.rm = TRUE),
+                  chla__observation = mean(chlorophyll, na.rm = TRUE),
+                  oxygen__sample_sd = sd(dissolvedOxygen, na.rm = TRUE),
+                  chla__sample_sd = sd(chlorophyll, na.rm = TRUE),
                   count = sum(!is.na(dissolvedOxygen)),
-                  chla_measure_error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
-                  oxygen_measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
+                  chla__measure_error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
+                  oxygen__measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
         # get in the same long format as the NEON portal data
         pivot_longer(cols = !c(time, site_id), 
                      names_to = c("variable", "stat"), 
-                     names_sep = "_") %>%
+                     names_sep = '__') %>%
         pivot_wider(names_from = stat, values_from = value)
       
     } 
@@ -164,17 +164,17 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
         # tsdWaterTempExpUncert = ifelse('tsdWaterTempExpUncert' %in% colnames(tsd_tibble_wider),
         #                                tsdWaterTempExpUncert, NA)) %>%
         group_by(siteName, time) %>%
-        summarize(temperature_observation = mean(tsdWaterTempMean, na.rm = TRUE),
+        summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(tsdWaterTempMean)),
-                  temperature_measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
-                  temperature_sample_sd = sd(tsdWaterTempMean, na.rm = TRUE),
+                  temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
+                  temperature__sample_sd = sd(tsdWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
         # get in the same long format as the NEON portal data
         pivot_longer(cols = !c(time, site_id), 
                      names_to = c("variable", "stat"), 
-                     names_sep = "_") %>%
+                     names_sep = '__') %>%
         pivot_wider(names_from = stat, values_from = value)
       
     } 
@@ -228,17 +228,17 @@ read.avro.prt <- function(sc, name = 'name', path) {
       daily_prt <- prt_tibble_wider  %>%
         mutate(time = as.Date(startDate)) %>%
         group_by(siteName, time) %>%
-        summarize(temperature_observation = mean(surfWaterTempMean, na.rm = TRUE),
+        summarize(temperature__observation = mean(surfWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(surfWaterTempMean)),
-                  temperature_measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
-                  temperature_sample_sd = sd(surfWaterTempMean, na.rm = TRUE),
+                  temperature__measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
+                  temperature__sample_sd = sd(surfWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
         # get in the same long format as the NEON portal data
         pivot_longer(cols = !c(time, site_id), 
                      names_to = c("variable", "stat"), 
-                     names_sep = "_") %>%
+                     names_sep = '__')%>%
         pivot_wider(names_from = stat, values_from = value)
       
     } 

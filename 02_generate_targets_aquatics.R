@@ -78,22 +78,23 @@ wq_portal <- wq_portal %>% # sensor depth of NA == surface?
   dplyr::mutate(dissolvedOxygen = ifelse(dissolvedOxygenFinalQF == 0, dissolvedOxygen, NA),
                 chla = ifelse(chlorophyllFinalQF == 0, chla, NA)) %>% 
   dplyr::group_by(site_id, time) %>%
-  dplyr::summarize(oxygen_observation = mean(dissolvedOxygen, na.rm = TRUE),
+  dplyr::summarize(oxygen__observation = mean(dissolvedOxygen, na.rm = TRUE),
                    sensorDepth = mean(sensorDepth, na.rm = TRUE),
-                   chla_observation = mean(chla, na.rm = TRUE),
+                   chla__observation = mean(chla, na.rm = TRUE),
                    
-                   oxygen_sample_sd = sd(dissolvedOxygen, na.rm = TRUE),
-                   chla_sample_sd = sd(chla, na.rm = TRUE),
+                   oxygen__sample_sd = sd(dissolvedOxygen, na.rm = TRUE),
+                   chla__sample_sd = sd(chla, na.rm = TRUE),
                    #why only using the count of non-NA in DO?
                    count = sum(!is.na(dissolvedOxygen)),
-                   chla_measure_error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
-                   oxygen_measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
+                   chla__measure_error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
+                   oxygen__measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>% 
-  dplyr::select(time, site_id, oxygen_observation, chla_observation,oxygen_sample_sd, chla_sample_sd, oxygen_measure_error, chla_measure_error) %>% 
+  dplyr::select(time, site_id, oxygen__observation, chla__observation, 
+                oxygen__sample_sd, chla__sample_sd, oxygen__measure_error, chla__measure_error) %>% 
   
   
   
-  pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "_") %>%
+  pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "__") %>%
   pivot_wider(names_from = stat, values_from = value) %>%
   filter(!(variable == "chla" & site_id %in% stream_sites))
   
@@ -310,12 +311,13 @@ temp_buoy <- temp_buoy %>%
   dplyr::filter(thermistorDepth <= 1.0 & (tsdWaterTempFinalQF == 0 | (tsdWaterTempFinalQF == 1 & as_date(startDateTime) > as_date("2020-07-01")))) %>% 
   dplyr::mutate(time = as_date(startDateTime)) %>%
   dplyr::group_by(time, site_id) %>% # use all the depths
-  dplyr::summarize(temperature_observation = mean(tsdWaterTempMean, na.rm = TRUE),
+  dplyr::summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(tsdWaterTempMean)),
-                   temperature_sample_sd = sd(tsdWaterTempMean, na.rm = T),
-                   temperature_measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
+                   temperature__sample_sd = sd(tsdWaterTempMean, na.rm = T),
+                   temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>%  
-  dplyr::select(time, site_id, temperature_observation, temperature_sample_sd, temperature_measure_error) 
+  dplyr::select(time, site_id, temperature__observation,
+                temperature__sample_sd, temperature__measure_error) 
  
 ## river temperatures ##
 temp_prt <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
@@ -332,13 +334,16 @@ temp_prt <- temp_prt %>%
   dplyr::group_by(time, site_id) %>%
   dplyr::summarize(temperature_observation = mean(surfWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(surfWaterTempMean)),
-                   temperature_sample_sd = sd(surfWaterTempMean),
-                   temperature_measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
+                   temperature__sample_sd = sd(surfWaterTempMean),
+                   temperature__measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>% 
-  dplyr::select(time, site_id, temperature_observation, temperature_sample_sd, temperature_measure_error) 
+  dplyr::select(time, site_id, temperature__observation, 
+                temperature__sample_sd, temperature__measure_error) 
 
 temp_tsd_prt <- rbind(temp_buoy, temp_prt) %>%
-  pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "_") %>%
+  pivot_longer(cols = !c(time, site_id), 
+               names_to = c("variable", "stat"),
+               names_sep = '__') %>%
   pivot_wider(names_from = stat, values_from = value)
 
 
