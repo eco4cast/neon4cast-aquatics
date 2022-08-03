@@ -91,9 +91,6 @@ wq_portal <- wq_portal %>% # sensor depth of NA == surface?
   #dplyr::filter(count > 44) %>% 
   dplyr::select(time, site_id, oxygen__observation, chla__observation, 
                 oxygen__sample_sd, chla__sample_sd, oxygen__measure_error, chla__measure_error) %>% 
-  
-  
-  
   pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "__") %>%
   pivot_wider(names_from = stat, values_from = value) %>%
   filter(!(variable == "chla" & site_id %in% stream_sites))
@@ -106,7 +103,7 @@ wq_portal <- wq_portal %>% # sensor depth of NA == surface?
 # where should these files be saved?
 
 download_location <- avro_file_directory
-fs::dir_create(download_location)
+fs::dir_create(download_location) # ignores existing directories unlike dir.create()
 
 # need to figure out which month's data are required
 # what is in the NEON store db?
@@ -332,7 +329,7 @@ temp_prt <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>%
 temp_prt <- temp_prt %>%
   dplyr::mutate(time = as_date(startDateTime)) %>% 
   dplyr::group_by(time, site_id) %>%
-  dplyr::summarize(temperature_observation = mean(surfWaterTempMean, na.rm = TRUE),
+  dplyr::summarize(temperature__observation = mean(surfWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(surfWaterTempMean)),
                    temperature__sample_sd = sd(surfWaterTempMean),
                    temperature__measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
@@ -351,12 +348,12 @@ temp_tsd_prt <- rbind(temp_buoy, temp_prt) %>%
 # download the 24/48hr provisional data from the Google Cloud
 
 # Start by deleting superseded files
-# Files that have been supersed by the NEON store files can be deleted from the relevent repository
+# Files that have been superseded by the NEON store files can be deleted from the relevant repository
 # Look in each repository to see if there are files that match the current maximum month of the NEON
 # store data
 
 delete.neon.avro(months = cur_wq_month,
-                 sites = unique(temp_bouy$site_id),# unique(sites$field_site_id),
+                 sites = unique(sites$field_site_id),
                  path = download_location)
 
 

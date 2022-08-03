@@ -201,7 +201,7 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
              variable = as.character(variable),
              observation = as.numeric(observation),
              sample_sd = as.numeric(sample_sd),
-             measure_error = as.numeric(error)) %>%
+             measure_error = as.numeric(measure_error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
   }
@@ -271,7 +271,7 @@ read.avro.prt <- function(sc, name = 'name', path) {
              variable = as.character(variable),
              observation = as.numeric(observation),
              sample_sd = as.numeric(sample_sd),
-             measure_error = as.numeric(error)) %>%
+             measure_error = as.numeric(measure_error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
   }
