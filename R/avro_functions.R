@@ -87,8 +87,8 @@ read.avro.wq <- function(sc, name = 'name', path) {
         group_by(siteName, time) %>%
         summarize(oxygen__observation = mean(dissolvedOxygen, na.rm = TRUE),
                   chla__observation = mean(chlorophyll, na.rm = TRUE),
-                  oxygen__sample_error = se(dissolvedOxygen, na.rm = TRUE),
-                  chla__sample_error = se(chlorophyll, na.rm = TRUE),
+                  oxygen__sample_error = se(dissolvedOxygen),
+                  chla__sample_error = se(chlorophyll),
                   count = sum(!is.na(dissolvedOxygen)),
                   chla__measure_error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
                   oxygen__measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
@@ -243,7 +243,7 @@ read.avro.prt <- function(sc, name = 'name', path) {
         summarize(temperature__observation = mean(surfWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(surfWaterTempMean)),
                   temperature__measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
-                  temperature__sample_error = se(surfWaterTempMean, na.rm = TRUE),
+                  temperature__sample_error = se(surfWaterTempMean),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
