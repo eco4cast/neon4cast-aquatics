@@ -87,8 +87,8 @@ read.avro.wq <- function(sc, name = 'name', path) {
         group_by(siteName, time) %>%
         summarize(oxygen__observation = mean(dissolvedOxygen, na.rm = TRUE),
                   chla__observation = mean(chlorophyll, na.rm = TRUE),
-                  oxygen__sample_sd = sd(dissolvedOxygen, na.rm = TRUE),
-                  chla__sample_sd = sd(chlorophyll, na.rm = TRUE),
+                  oxygen__sample_error = se(dissolvedOxygen, na.rm = TRUE),
+                  chla__sample_error = se(chlorophyll, na.rm = TRUE),
                   count = sum(!is.na(dissolvedOxygen)),
                   chla__measure_error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
                   oxygen__measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
@@ -117,13 +117,13 @@ read.avro.wq <- function(sc, name = 'name', path) {
                           time = NA, 
                           variable = NA,
                           observation = NA, 
-                          sample_sd = NA,
+                          sample_error = NA,
                           measure_error = NA)  %>%
         mutate(site_id = as.character(site_id),
                time = as.Date(time),
                variable = as.character(variable),
                observation = as.numeric(observation),
-               sample_sd = as.numeric(sample_sd),
+               sample_error = as.numeric(sample_error),
                measure_error = as.numeric(measure_error)) %>%
         filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
       return(empty)
@@ -173,7 +173,7 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
         summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(tsdWaterTempMean)),
                   temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
-                  temperature__sample_sd = sd(tsdWaterTempMean, na.rm = TRUE),
+                  temperature__sample_error = se(tsdWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
@@ -194,13 +194,13 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
                         time = NA, 
                         variable = NA, 
                         observation = NA, 
-                        sample_sd = NA,
+                        sample_error = NA,
                         measure_error = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
              observation = as.numeric(observation),
-             sample_sd = as.numeric(sample_sd),
+             sample_error = as.numeric(sample_error),
              measure_error = as.numeric(measure_error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
@@ -243,7 +243,7 @@ read.avro.prt <- function(sc, name = 'name', path) {
         summarize(temperature__observation = mean(surfWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(surfWaterTempMean)),
                   temperature__measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
-                  temperature__sample_sd = sd(surfWaterTempMean, na.rm = TRUE),
+                  temperature__sample_error = se(surfWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
@@ -264,13 +264,13 @@ read.avro.prt <- function(sc, name = 'name', path) {
                         time = NA, 
                         variable = NA, 
                         observation = NA, 
-                        sample_sd = NA,
+                        sample_error = NA,
                         measure_error = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
              observation = as.numeric(observation),
-             sample_sd = as.numeric(sample_sd),
+             sample_error = as.numeric(sample_error),
              measure_error = as.numeric(measure_error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)

@@ -21,6 +21,12 @@ source('R/avro_functions.R')
 # spark_install(version = '3.0')
 
 `%!in%` <- Negate(`%in%`) # not in function
+# function to calculate the standard error of the mean
+se <- function(x) {
+  se <- sd(x, na.rm = T)/(sqrt(length(which(!is.na(x)))))
+  return(se)
+}
+
 
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
@@ -82,22 +88,22 @@ wq_portal <- wq_portal %>% # sensor depth of NA == surface?
                    sensorDepth = mean(sensorDepth, na.rm = TRUE),
                    chla__observation = mean(chla, na.rm = TRUE),
                    
-                   oxygen__sample_sd = sd(dissolvedOxygen, na.rm = TRUE),
-                   chla__sample_sd = sd(chla, na.rm = TRUE),
+                   oxygen__sample_error = se(dissolvedOxygen),
+                   chla__sample_error = se(chla),
                    #why only using the count of non-NA in DO?
                    count = sum(!is.na(dissolvedOxygen)),
                    chla__measure_error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
                    oxygen__measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>% 
   dplyr::select(time, site_id, oxygen__observation, chla__observation, 
-                oxygen__sample_sd, chla__sample_sd, oxygen__measure_error, chla__measure_error) %>% 
+                oxygen__sample_error, chla__sample_error, oxygen__measure_error, chla__measure_error) %>% 
   pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "__") %>%
   pivot_wider(names_from = stat, values_from = value) %>%
   filter(!(variable == "chla" & site_id %in% stream_sites))
   
 #====================================================#
 
-# ======= low latency WQ data =======
+#### low latency WQ data =======
 # download the 24/48hr provisional data from the Google Cloud
 
 # where should these files be saved?
@@ -160,7 +166,7 @@ wq_full <- dplyr::bind_rows(wq_portal, wq_avro_df) %>%
 
 #==============================#
 
-# ======== WQ QC protocol =======
+#### WQ QC protocol =======
 # additional QC steps implemented (FO, 2022-07-13)
 ##### check 1 Gross range tests on DO and chlorophyll
 # DO ranges for each sensor and each season
@@ -199,20 +205,20 @@ wq_cleaned <- wq_full %>%
                                  observation < 4 &
                                  variable == "oxygen", NA, measure_error),
                 
-                sample_sd = ifelse(site_id == "MAYF" & 
+                sample_error = ifelse(site_id == "MAYF" & 
                               between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                              variable == "oxygen", NA, sample_sd),
-                sample_sd = ifelse(site_id == "WLOU" &
+                              variable == "oxygen", NA, sample_error),
+                sample_error = ifelse(site_id == "WLOU" &
                               !between(observation, 7.5, 11) & 
-                              variable == "oxygen", NA, sample_sd),
-                sample_sd = ifelse(site_id == "BARC" & 
+                              variable == "oxygen", NA, sample_error),
+                sample_error = ifelse(site_id == "BARC" & 
                               observation < 4 &
-                              variable == "oxygen", NA, sample_sd))
+                              variable == "oxygen", NA, sample_error))
 
 #===============================================#
 
 
-### Generate surface (< 1 m) temperature #############
+#### Generate surface (< 1 m) temperature #############
   # "raw data" (L1 NEON data product) is the 30 min average taken from 1 min measurements
 
 ## lake temperatures ##
@@ -310,11 +316,11 @@ temp_buoy <- temp_buoy %>%
   dplyr::group_by(time, site_id) %>% # use all the depths
   dplyr::summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(tsdWaterTempMean)),
-                   temperature__sample_sd = sd(tsdWaterTempMean, na.rm = T),
+                   temperature__sample_error = se(tsdWaterTempMean, na.rm = T),
                    temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>%  
   dplyr::select(time, site_id, temperature__observation,
-                temperature__sample_sd, temperature__measure_error) 
+                temperature__sample_error, temperature__measure_error) 
  
 ## river temperatures ##
 temp_prt <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
@@ -331,11 +337,11 @@ temp_prt <- temp_prt %>%
   dplyr::group_by(time, site_id) %>%
   dplyr::summarize(temperature__observation = mean(surfWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(surfWaterTempMean)),
-                   temperature__sample_sd = sd(surfWaterTempMean),
+                   temperature__sample_error = se(surfWaterTempMean),
                    temperature__measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>% 
   dplyr::select(time, site_id, temperature__observation, 
-                temperature__sample_sd, temperature__measure_error) 
+                temperature__sample_error, temperature__measure_error) 
 
 temp_tsd_prt <- rbind(temp_buoy, temp_prt) %>%
   pivot_longer(cols = !c(time, site_id), 
@@ -344,7 +350,7 @@ temp_tsd_prt <- rbind(temp_buoy, temp_prt) %>%
   pivot_wider(names_from = stat, values_from = value)
 
 
-#========= low latency water temperature data =========
+#### low latency water temperature data =========
 # download the 24/48hr provisional data from the Google Cloud
 
 # Start by deleting superseded files
@@ -414,7 +420,7 @@ temp_full <- dplyr::bind_rows(temp_tsd_prt, tsd_avro_df, prt_avro_df) %>%
   dplyr::arrange(site_id, time)
 
 
-#==============================#
+#### Temp QC protocol=================
 
 # additional QC steps implemented (FO, 2022-07-13)
 ##### check 1 Gross range tests on temperature
@@ -427,24 +433,24 @@ temp_cleaned <-
   temp_full %>%
   dplyr::mutate(observation =ifelse(observation >= T_min & observation <= T_max , 
                                     observation, NA),
-                sample_sd = ifelse(observation >= T_min & observation <= T_max , 
-                            sample_sd, NA),
+                sample_error = ifelse(observation >= T_min & observation <= T_max , 
+                            sample_error, NA),
                 measure_error = ifelse(observation >= T_min & observation <= T_max , 
                                measure_error, NA))  %>%
   # manual cleaning based on observationervations
   dplyr:: mutate(observation = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
                                       NA, observation),
-                 sample_sd = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
-                             NA, sample_sd),
+                 sample_error = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
+                             NA, sample_error),
                  measure_error = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
                                 NA, measure_error))
  
 
-#==============================================
+#### Targets==========================
 targets_long <- dplyr::bind_rows(wq_cleaned, temp_cleaned) %>%
   dplyr::arrange(site_id, time, variable) %>%
   dplyr::mutate(observation = ifelse(is.nan(observation), NA, observation),
-                sample_sd = ifelse(is.nan(sample_sd), NA, sample_sd),
+                sample_error = ifelse(is.nan(sample_error), NA, sample_error),
                 measure_error = ifelse(is.nan(measure_error), NA, measure_error))
 
 ### Write out the targets
