@@ -113,12 +113,18 @@ read.avro.wq <- function(sc, name = 'name', path) {
     return(daily_wq)
   } else {
       # create an empty df to return
-      empty <- data.frame(site_id = NA, time = NA, variable = NA, observation = NA, error = NA)  %>%
+      empty <- data.frame(site_id = NA, 
+                          time = NA, 
+                          variable = NA,
+                          observation = NA, 
+                          sample_sd = NA,
+                          measure_error = NA)  %>%
         mutate(site_id = as.character(site_id),
                time = as.Date(time),
                variable = as.character(variable),
                observation = as.numeric(observation),
-               error = as.numeric(error)) %>%
+               sample_sd = as.numeric(sample_sd),
+               measure_error = as.numeric(measure_error)) %>%
         filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
       return(empty)
   }
@@ -184,12 +190,18 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
     return(daily_tsd)
   } else {
     # create an empty df to return
-    empty <- data.frame(site_id = NA, time = NA, variable = NA, observation = NA, error = NA)  %>%
+    empty <- data.frame(site_id = NA,
+                        time = NA, 
+                        variable = NA, 
+                        observation = NA, 
+                        sample_sd = NA,
+                        measure_error = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
              observation = as.numeric(observation),
-             error = as.numeric(error)) %>%
+             sample_sd = as.numeric(sample_sd),
+             measure_error = as.numeric(error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
   }
@@ -248,12 +260,18 @@ read.avro.prt <- function(sc, name = 'name', path) {
     return(daily_prt)
   } else {
     # create an empty df to return
-    empty <- data.frame(site_id = NA, time = NA, variable = NA, observation = NA, error = NA)  %>%
+    empty <- data.frame(site_id = NA, 
+                        time = NA, 
+                        variable = NA, 
+                        observation = NA, 
+                        sample_sd = NA,
+                        measure_error = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
              observation = as.numeric(observation),
-             error = as.numeric(error)) %>%
+             sample_sd = as.numeric(sample_sd),
+             measure_error = as.numeric(error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
   }
