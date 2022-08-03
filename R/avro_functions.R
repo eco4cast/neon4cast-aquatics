@@ -208,6 +208,85 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
 }
 
 
+read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
+  message(paste0('reading file ', path))
+  tsd_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
+                                         path = path) %>%
+    filter(termName %in% tsd_vars) %>%
+    # for streams want to omit the downstream measurement (102) and retain upstream (101)
+    # rivers and lakes horizontal index is 103
+    filter(horizontalIndex %in% c('101', '103'), 
+           temporalIndex == 030) %>% # take the 30-minutely data only
+    select(siteName, termName, startDate, 
+           doubleValue, intValue, verticalIndex) %>%
+    # combine the value fields to one
+    mutate(Value = ifelse(is.na(doubleValue), 
+                          intValue, doubleValue)) %>%
+    select(any_of(columns_keep)) 
+  
+  
+  tsd_tibble <- tsd_avro %>%
+    as.data.frame() %>%
+    suppressWarnings() %>%
+    inner_join(., thermistor_depths, by = c('siteName', 'verticalIndex')) 
+  
+  if (nrow(tsd_tibble) >=1) {
+    tsd_tibble_wider <- tsd_tibble %>%
+      arrange(startDate, termName) %>%
+      pivot_wider(names_from = termName, values_from = Value) %>%
+      filter_at(vars(ends_with('QF')), any_vars(. != 1)) # checks to see if any of the QF cols have a 1
+    
+    # if the filtering has left rows then find the mean
+    if (nrow(tsd_tibble_wider) >= 1) {
+      hourly_tsd <- tsd_tibble_wider  %>%
+        mutate(time = lubridate::ymd_h(format(startDate, "%Y-%m-%d %H"))) %>%
+        # add missing columns (sites with no tsdWaterTempMean), need all otherwise function won't run
+        # tsdWaterTempMean = ifelse('tsdWaterTempMean' %in% colnames(tsd_tibble_wider), 
+        #                           tsdWaterTempMean, NA),
+        # tsdWaterTempExpUncert = ifelse('tsdWaterTempExpUncert' %in% colnames(tsd_tibble_wider),
+        #                                tsdWaterTempExpUncert, NA)) %>%
+        group_by(siteName, time, thermistorDepth) %>%
+        summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
+                  count = sum(!is.na(tsdWaterTempMean)),
+                  temperature__measure_error = mean(tsdWaterTempExpUncert) / sqrt(count),
+                  temperature__sample_error = se(tsdWaterTempMean),
+                  .groups = "drop") %>%
+        rename(site_id = siteName,
+               depth = thermistorDepth) %>%
+        select(-count) %>%
+        # get in the same long format as the NEON portal data
+        pivot_longer(cols = !c(time, site_id, depth), 
+                     names_to = c("variable", "stat"), 
+                     names_sep = '__') %>%
+        pivot_wider(names_from = stat, values_from = value)
+      
+    } 
+  }
+  
+  if (exists('hourly_tsd')) {
+    return(hourly_tsd)
+  } else {
+    # create an empty df to return
+    empty <- data.frame(site_id = NA,
+                        time = NA, 
+                        depth = NA,
+                        variable = NA, 
+                        observation = NA, 
+                        sample_error = NA,
+                        measure_error = NA)  %>%
+      mutate(site_id = as.character(site_id),
+             time = as.Date(time),
+             depth = as.numeric(depth),
+             variable = as.character(variable),
+             observation = as.numeric(observation),
+             sample_error = as.numeric(sample_error),
+             measure_error = as.numeric(measure_error)) %>%
+      filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
+    return(empty)
+  }
+}
+
+
 read.avro.prt <- function(sc, name = 'name', path) {
   message(paste0('reading file ', path))
   prt_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
