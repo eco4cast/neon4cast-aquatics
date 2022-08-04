@@ -173,7 +173,7 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
         summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(tsdWaterTempMean)),
                   temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
-                  temperature__sample_error = se(tsdWaterTempMean, na.rm = TRUE),
+                  temperature__sample_error = se(tsdWaterTempMean),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
         select(-count) %>%
