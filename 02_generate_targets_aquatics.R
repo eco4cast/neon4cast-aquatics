@@ -21,12 +21,6 @@ source('R/avro_functions.R')
 # spark_install(version = '3.0')
 
 `%!in%` <- Negate(`%in%`) # not in function
-# function to calculate the standard error of the mean
-se <- function(x) {
-  se <- sd(x, na.rm = T)/(sqrt(length(which(!is.na(x)))))
-  return(se)
-}
-
 
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
@@ -425,108 +419,18 @@ hourly_temp_profile_lakes <- rbind(hourly_temp_profile_portal, hourly_temp_profi
 #### Generate surface (< 1 m) temperature #############
   # "raw data" (L1 NEON data product) is the 30 min average taken from 1 min measurements
 
-## lake temperatures ##
-temp_buoy <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP1.20264.001")) %>%
-  # neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
-  rename(site_id = siteID) %>%
-  dplyr::select(startDateTime, site_id, tsdWaterTempMean, thermistorDepth, tsdWaterTempExpUncert, tsdWaterTempFinalQF, verticalPosition) %>%
-  dplyr::collect()
-
-temp_buoy <- temp_buoy %>%
-  # errors in the sensor depths reported - see "https://www.neonscience.org/impact/observatory-blog/incorrect-depths-associated-lake-and-river-temperature-profiles"
-    # sensor depths are manually assigned based on "vertical position" variable as per table on webpage
-  dplyr::mutate(thermistorDepth = ifelse(site_id == "CRAM" & 
-                                    lubridate::as_date(startDateTime) < lubridate::as_date("2020-11-01") & 
-                                    verticalPosition == 502, 1.75, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "CRAM" & 
-                                    lubridate::as_date(startDateTime) < lubridate::as_date("2020-11-01") & 
-                                    verticalPosition == 503, 3.45, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "CRAM" & 
-                                    lubridate::as_date(startDateTime) < lubridate::as_date("2020-11-01") & 
-                                    verticalPosition == 504, 5.15, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "CRAM" & 
-                                    lubridate::as_date(startDateTime) < lubridate::as_date("2020-11-01") & 
-                                    verticalPosition == 505, 6.85, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "CRAM" & 
-                                    lubridate::as_date(startDateTime) < lubridate::as_date("2020-11-01") & 
-                                    verticalPosition == 506, 8.55, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "CRAM" & 
-                                    lubridate::as_date(startDateTime) < lubridate::as_date("2020-11-01") & 
-                                    verticalPosition == 505, 10.25, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) < lubridate::as_date("2021-06-08") | 
-                                       lubridate::as_date(startDateTime) > lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 502, 0.55, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) < lubridate::as_date("2021-06-08") | 
-                                       lubridate::as_date(startDateTime) > lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 503, 1.05, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) < lubridate::as_date("2021-06-08") | 
-                                       lubridate::as_date(startDateTime) > lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 504, 1.55, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) < lubridate::as_date("2021-06-08") | 
-                                       lubridate::as_date(startDateTime) > lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 505, 2.05, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) < lubridate::as_date("2021-06-08") | 
-                                       lubridate::as_date(startDateTime) > lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 506, 2.55, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) < lubridate::as_date("2021-06-08") | 
-                                       lubridate::as_date(startDateTime) > lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 507, 3.05, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) >= lubridate::as_date("2021-06-08") & 
-                                       lubridate::as_date(startDateTime) <= lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 502, 0.3, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) >= lubridate::as_date("2021-06-08") & 
-                                       lubridate::as_date(startDateTime) <= lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 503, 0.55, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) >= lubridate::as_date("2021-06-08") & 
-                                       lubridate::as_date(startDateTime) <= lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 504, 0.8, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) >= lubridate::as_date("2021-06-08") & 
-                                       lubridate::as_date(startDateTime) <= lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 505, 1.05, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) >= lubridate::as_date("2021-06-08") & 
-                                       lubridate::as_date(startDateTime) <= lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 506, 1.3, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) >= lubridate::as_date("2021-06-08") & 
-                                       lubridate::as_date(startDateTime) <= lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 507, 1.55, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) >= lubridate::as_date("2021-06-08") & 
-                                       lubridate::as_date(startDateTime) <= lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 508, 2.05, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) >= lubridate::as_date("2021-06-08") & 
-                                       lubridate::as_date(startDateTime) <= lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 509, 2.55, thermistorDepth),
-         thermistorDepth = ifelse(site_id == "BARC" & 
-                                    (lubridate::as_date(startDateTime) >= lubridate::as_date("2021-06-08") | 
-                                       lubridate::as_date(startDateTime) <= lubridate::as_date("2022-01-07") )& 
-                                    verticalPosition == 510, 3.05, thermistorDepth)) %>% 
-  # take only surface measurements with no flags 
-    # OR if there is a flag but the date is within the period defined by the issues on the sensorDepth above
-  dplyr::filter(thermistorDepth <= 1.0 & (tsdWaterTempFinalQF == 0 | (tsdWaterTempFinalQF == 1 & as_date(startDateTime) > as_date("2020-07-01")))) %>% 
-  dplyr::mutate(time = as_date(startDateTime)) %>%
-  dplyr::group_by(time, site_id) %>% # use all the depths
-  dplyr::summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
-                   count = sum(!is.na(tsdWaterTempMean)),
-                   temperature__sample_error = se(tsdWaterTempMean, na.rm = T),
-                   temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
-  #dplyr::filter(count > 44) %>%  
-  dplyr::select(time, site_id, temperature__observation,
-                temperature__sample_error, temperature__measure_error) 
+###### Lake temperatures #####
+# Daily surface lake temperatures generated from the hourly profiles created above
+daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
+  filter(depth <= 1) %>%
+  mutate(time = lubridate::as_date(time)) %>%
+  group_by(site_id, time) %>%
+  summarise(observation = mean(observation, na.rm = T),
+            sample_error = mean(sample_error, na.rm = T),
+            measure_error = mean(measure_error, na.rm = T)) %>%
+  mutate(variable = 'temperature')     
  
-## river temperatures ##
+##### stream temperatures #####
 temp_prt <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
   # neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
   dplyr::rename(site_id = siteID) %>%
@@ -545,13 +449,21 @@ temp_prt <- temp_prt %>%
                    temperature__measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>% 
   dplyr::select(time, site_id, temperature__observation, 
-                temperature__sample_error, temperature__measure_error) 
-
-temp_tsd_prt <- rbind(temp_buoy, temp_prt) %>%
+                temperature__sample_error, temperature__measure_error) %>%
   pivot_longer(cols = !c(time, site_id), 
                names_to = c("variable", "stat"),
                names_sep = '__') %>%
-  pivot_wider(names_from = stat, values_from = value)
+  pivot_wider(names_from = stat, values_from = value) 
+
+temp_prt_QC <- temp_prt %>%
+  temp_QC(df = ., range = c(-5, 40), spike = 7, by.depth = F)  %>%
+  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
+  
+
+##### river temperature ######
+
+temp_tsd_prt <- rbind(daily_temp_surface_lakes, temp_prt) %>%
+  
 
 
 #### low latency water temperature data =========
