@@ -1,3 +1,7 @@
+#### Temperature data QC ####
+# Function to QC temperature profiles 
+  # option to group by site and depth or just by site
+  # need to specify the 1) absolute range (vector - length 2) and the 2) the acceptable rate of change (absolute value)
 temp_QC <- function(df, range, spike, by.depth = T) {
   if (by.depth == F) {
     df_QC <- df %>%
@@ -39,4 +43,12 @@ temp_QC <- function(df, range, spike, by.depth = T) {
       select(-c(contains('flag'), temp_change))
   }
   return(df_QC)
+}
+
+
+#### Standard Error ####
+# Function to calculate the standard error of the mean
+se <- function(x) {
+  se <- sd(x, na.rm = T)/(sqrt(length(which(!is.na(x)))))
+  return(se)
 }
