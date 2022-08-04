@@ -323,6 +323,7 @@ hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP
   mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
 
 ##### Sonde EDI data #####
+  # Only 6 lake sites available on EDI
 edi_url_lake <- c("https://pasta.lternet.edu/package/data/eml/edi/1071/1/7f8aef451231d5388c98eef889332a4b",
                   "https://pasta.lternet.edu/package/data/eml/edi/1071/1/2c8893684d94b9a52394060a76cab798", 
                   "https://pasta.lternet.edu/package/data/eml/edi/1071/1/770e2ab9d957991a787a2f990d5a2fad",
@@ -336,9 +337,7 @@ lake_edi_profile <- c("NEON.D03.BARC.DP0.20005.001.01378.csv",
                       "NEON.D09.PRPO.DP0.20005.001.01378.csv",
                       "NEON.D03.SUGG.DP0.20005.001.01378.csv")
 
-# Where are the files to be saved?
-directory <- 'C:/Users/freya/Downloads'
-
+# Download the data
 for(i in 1:length(edi_url_lake)){
   if (!file.exists(file.path(directory, "data_raw", lake_edi_profile[i]))) {
     if (!dir.exists(dirname(file.path(directory, "data_raw", 
@@ -353,7 +352,7 @@ for(i in 1:length(edi_url_lake)){
 
 
 # List all the files in the EDI directory 
-edi_data <- list.files(file.path(directory, 'data_raw'), full.names = T)
+edi_data <- list.files(file.path(EDI_file_directory), full.names = T)
 # Get the lake sites subset
 edi_lake_files <- c(edi_data[grepl(x = edi_data, pattern= lake_sites[1])],
                      edi_data[grepl(x = edi_data, pattern= lake_sites[2])],
@@ -426,13 +425,15 @@ hourly_temp_profile_avro <- purrr::map_dfr(.x = lake_avro_files,
 
 # Combine the three data sources
 hourly_temp_profile_lakes <- rbind(hourly_temp_profile_portal, hourly_temp_profile_EDI, hourly_temp_profile_avro) %>%
-  arrange(time, site_id, depth)
+  arrange(time, site_id, depth) %>%
+  group_by(time, site_id, depth) %>%
+  summarise(observation = mean(observation, na.rm = T),
+            sample_error = mean(sample_error, na.rm = T),
+            measure_error = mean(measure_error, na.rm = T))
 
 #======================================================#
 
 #### Generate surface (< 1 m) temperature #############
-  # "raw data" (L1 NEON data product) is the 30 min average taken from 1 min measurements
-
 ###### Lake temperatures #####
 # Daily surface lake temperatures generated from the hourly profiles created above
 daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
@@ -511,7 +512,8 @@ prt_avro_files <- paste0(download_location, '/',
 
 # Read in each of the files and then bind by rows
 temp_streams_avros <- purrr::map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc, path = .x)) %>%
-  QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F) 
+  QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F) %>%
+  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
   
 #===============================================#
 
@@ -555,8 +557,7 @@ river_edi_profile <- c("NEON.D03.FLNT.DP0.20005.001.01378.csv",
                        "NEON.D03.BLWA.DP0.20005.001.01378.csv",
                        "NEON.D03.TOMB.DP0.20005.001.01378.csv")
 
-# where is it to be saved?
-directory <- 'C:/Users/freya/Downloads'
+
 
 for(i in 1:length(edi_url_river)){
   if (!file.exists(file.path(directory, "data_raw",river_edi_profile[i]))) {
