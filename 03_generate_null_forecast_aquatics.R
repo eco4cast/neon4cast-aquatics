@@ -323,14 +323,6 @@ meta_data_filename <- generate_metadata(forecast_file =  forecast_file,
                                         forecast_file_name_base = forecast_file_name_base)
 
 
-#'Publish the forecast automatically.  Run only on EFI Challenge server
-if(efi_server){
-  source("../challenge-ci/R/publish.R")
-  publish(code = "03_generate_null_forecast_aquatics.R",
-          data_in = "aquatics-targets.csv.gz",
-          data_out = forecast_file,
-          meta = meta_data_filename,
-          prefix = "aquatics/",
-          bucket = "neon4cast-forecasts",
-          registries = "https://hash-archive.carlboettiger.info")
-}
+neon4cast::submit(forecast_file = forecast_file, 
+                  metadata = meta_data_filename, 
+                  ask = FALSE)
