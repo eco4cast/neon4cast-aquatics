@@ -2,7 +2,7 @@
 
 #'## Set-up
 
-print(paste0("Running Creating Daily Terrestrial Forecasts at ", Sys.time()))
+print(paste0("Running Creating persistance aquatics Forecasts at ", Sys.time()))
 
 #'Load renv.lock file that includes the versions of all the packages used
 #'You can generate using the command renv::snapshot()
@@ -36,10 +36,10 @@ efi_server <- TRUE
 #)
 
 #'Team name code
-team_name <- "EFInull"
+team_name <- "persistance"
 
 #'Download target file from the server
-download.file("https://data.ecoforecast.org/targets/aquatics/aquatics-targets.csv.gz",
+download.file("https://data.ecoforecast.org/neon4cast-targets/aquatics/aquatics-targets.csv.gz",
               "aquatics-targets.csv.gz")
 
 #'Read in target file.  The guess_max is specified because there could be a lot of
@@ -325,12 +325,12 @@ meta_data_filename <- generate_metadata(forecast_file =  forecast_file,
 
 #'Publish the forecast automatically.  Run only on EFI Challenge server
 if(efi_server){
-  source("../neon4cast-shared-utilities/publish.R")
+  source("../challenge-ci/R/publish.R")
   publish(code = "03_generate_null_forecast_aquatics.R",
           data_in = "aquatics-targets.csv.gz",
           data_out = forecast_file,
           meta = meta_data_filename,
           prefix = "aquatics/",
-          bucket = "forecasts",
+          bucket = "neon4cast-forecasts",
           registries = "https://hash-archive.carlboettiger.info")
 }
