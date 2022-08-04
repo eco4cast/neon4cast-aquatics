@@ -331,6 +331,6 @@ if(efi_server){
           data_out = forecast_file,
           meta = meta_data_filename,
           prefix = "aquatics/",
-          bucket = "forecasts",
+          bucket = "neon4cast-forecasts",
           registries = "https://hash-archive.carlboettiger.info")
 }
