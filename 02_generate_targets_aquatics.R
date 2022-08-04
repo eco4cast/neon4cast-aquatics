@@ -103,7 +103,7 @@ wq_portal <- wq_portal %>% # sensor depth of NA == surface?
   
 #====================================================#
 
-#### low latency WQ data =======
+##### low latency WQ data =======
 # download the 24/48hr provisional data from the Google Cloud
 
 # where should these files be saved?
@@ -166,7 +166,7 @@ wq_full <- dplyr::bind_rows(wq_portal, wq_avro_df) %>%
 
 #==============================#
 
-#### WQ QC protocol =======
+##### WQ QC protocol =======
 # additional QC steps implemented (FO, 2022-07-13)
 ##### check 1 Gross range tests on DO and chlorophyll
 # DO ranges for each sensor and each season
@@ -317,7 +317,10 @@ hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP
   pivot_longer(names_to = c('variable','stat'),
                names_sep = '__',
                cols = c(temperature__observation,temperature__sample_error, temperature__measure_error)) %>%
-  pivot_wider(names_from = stat, values_from = value)
+  pivot_wider(names_from = stat, values_from = value) %>%
+  # include first QC of data
+  temp_QC(df = ., range = c(-5, 40), spike = 5, by.depth = T) %>%
+  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
 
 ##### Sonde EDI data #####
 edi_url_lake <- c("https://pasta.lternet.edu/package/data/eml/edi/1071/1/7f8aef451231d5388c98eef889332a4b",
@@ -374,7 +377,9 @@ hourly_temp_profile_EDI <- purrr::map_dfr(.x = edi_lake_files, ~ read.csv(file =
                names_sep = '__',
                cols = temperature__observation:temperature__sample_error) %>%
   pivot_wider(names_from = stat, values_from = value) %>%
-  mutate(measure_error = NA)
+  mutate(measure_error = NA) %>%
+  # include first QC of data
+  temp_QC(df = ., range = c(-5, 40), spike = 5, by.depth = T)
 
 ##### avros data #####
 # Download any new files from the Google Cloud
@@ -403,7 +408,13 @@ tsd_avro_files <- paste0(download_location, '/',
                                     recursive = T))
 
 # Read in each of the files and then bind by rows
-hourly_temp_profile_avro <- purrr::map_dfr(.x = tsd_avro_files, ~ read.avro.tsd.profile(sc= sc, path = .x, thermistor_depths = thermistor_depths))
+hourly_temp_profile_avro <- purrr::map_dfr(.x = tsd_avro_files,
+                                           ~ read.avro.tsd.profile(sc= sc,
+                                                                   path = .x,
+                                                                   thermistor_depths = thermistor_depths)) %>% 
+  # include first QC of data
+  temp_QC(df = ., range = c(-5, 40), spike = 5, by.depth = T)  %>%
+  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
 
 # Combine the three data sources
 hourly_temp_profile_lakes <- rbind(hourly_temp_profile_portal, hourly_temp_profile_EDI, hourly_temp_profile_avro) %>%
