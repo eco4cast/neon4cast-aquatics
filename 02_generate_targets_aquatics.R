@@ -1,7 +1,13 @@
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
 avro_file_directory <- "/home/rstudio/data/aquatic_avro"
-Sys.setenv("NEONSTORE_HOME" = "/home/rstudio/data/neonstore") #Sys.setenv("NEONSTORE_HOME" = "/efi_neon_challenge/neonstore")
+EDI_file_directory <- "/home/rstudio/data/aquatic_EDI"
+
+neon <- arrow::s3_bucket("neon4cast-targets/neon",
+                         endpoint_override = "data.ecoforecast.org",
+                         anonymous = TRUE)
+
+# Sys.setenv("NEONSTORE_HOME" = "/home/rstudio/data/neonstore") #Sys.setenv("NEONSTORE_HOME" = "/efi_neon_challenge/neonstore")
 #Sys.setenv("NEONSTORE_DB" = "home/rstudio/data/neonstore")    #Sys.setenv("NEONSTORE_DB" = "/efi_neon_challenge/neonstore")
 
 Sys.unsetenv("AWS_DEFAULT_REGION")
@@ -18,6 +24,7 @@ library(contentid)
 library(sparklyr)
 library(sparkavro)
 source('R/avro_functions.R')
+source('R/data_processing.R')
 # spark_install(version = '3.0')
 
 `%!in%` <- Negate(`%in%`) # not in function
@@ -52,9 +59,7 @@ stream_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Wadeable
 
 
 #### Generate WQ table #############
-neon <- arrow::s3_bucket("neon4cast-targets/neon",
-                           endpoint_override = "data.ecoforecast.org",
-                           anonymous = TRUE)
+
 # list tables with `neon$ls()`
 wq_portal <- arrow::open_dataset(neon$path("waq_instantaneous-basic-DP1.20288.001")) %>%   # waq_instantaneous
   dplyr::filter(siteID %in% sites$field_site_id) %>%
@@ -467,8 +472,9 @@ temp_streams_portal <- temp_streams_portal %>%
 temp_streams_portal_QC <- temp_streams_portal %>%
   QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F)  %>%
   mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
+#===========================================#
   
-#==== low latency water temperature data =========
+    #### avros
 # download the 24/48hr provisional data from the Google Cloud
 
 # Start by deleting superseded files
@@ -507,6 +513,8 @@ prt_avro_files <- paste0(download_location, '/',
 temp_streams_avros <- purrr::map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc, path = .x)) %>%
   QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F) 
   
+#===============================================#
+
 ##### river temperature ######
 # For non-wadeable rivers need portal, EDI and avro data
   
@@ -605,7 +613,7 @@ temp_rivers_avros <- purrr::map_dfr(.x = river_avro_files,
   # include first QC of data
   QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = F)  %>%
   mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
-
+#===========================================#
 
 #### surface temperatures ####
 
