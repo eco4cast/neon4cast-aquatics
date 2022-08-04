@@ -2,9 +2,10 @@
 # Function to QC temperature profiles 
   # option to group by site and depth or just by site
   # need to specify the 1) absolute range (vector - length 2) and the 2) the acceptable rate of change (absolute value)
-temp_QC <- function(df, range, spike, by.depth = T) {
+QC.temp <- function(df, range, spike, by.depth = T) {
   if (by.depth == F) {
     df_QC <- df %>%
+      arrange(site_id, time) %>%
       group_by(site_id) %>%
       mutate(temp_change = observation - lag(observation), 
              
@@ -24,6 +25,7 @@ temp_QC <- function(df, range, spike, by.depth = T) {
       select(-c(contains('flag'), temp_change))
   } else {
     df_QC <- df %>%
+      arrange(site_id, time) %>%
       group_by(site_id, depth) %>%
       mutate(temp_change = observation - lag(observation), 
              
