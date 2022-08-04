@@ -216,6 +216,7 @@ hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP
   # neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
   rename(site_id = siteID,
          depth = thermistorDepth) %>%
+  dplyr::filter(site_id %in% lake_sites) %>%
   dplyr::select(startDateTime, site_id, tsdWaterTempMean, depth, tsdWaterTempExpUncert, tsdWaterTempFinalQF, verticalPosition) %>%
   dplyr::collect() %>%
   # errors in the sensor depths reported - see "https://www.neonscience.org/impact/observatory-blog/incorrect-depths-associated-lake-and-river-temperature-profiles"
@@ -313,7 +314,7 @@ hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP
                cols = c(temperature__observation,temperature__sample_error, temperature__measure_error)) %>%
   pivot_wider(names_from = stat, values_from = value) %>%
   # include first QC of data
-  temp_QC(df = ., range = c(-5, 40), spike = 5, by.depth = T) %>%
+  QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T) %>%
   mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
 
 ##### Sonde EDI data #####
@@ -373,7 +374,7 @@ hourly_temp_profile_EDI <- purrr::map_dfr(.x = edi_lake_files, ~ read.csv(file =
   pivot_wider(names_from = stat, values_from = value) %>%
   mutate(measure_error = NA) %>%
   # include first QC of data
-  temp_QC(df = ., range = c(-5, 40), spike = 5, by.depth = T)
+  QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T)
 
 ##### avros data #####
 # Download any new files from the Google Cloud
@@ -395,19 +396,27 @@ tsd_vars <- c('siteName',
 columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
 thermistor_depths <- readr::read_csv('https://raw.githubusercontent.com/OlssonF/neon4cast-aquatics/master/thermistorDepths.csv', col_types = 'ccd')
 
+
 # Generate a list of files to be read
 tsd_avro_files <- paste0(download_location, '/',
                          list.files(path = download_location,
                                     pattern = '*20264', 
                                     recursive = T))
+lake_avro_files <- c(tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[1])],
+                     tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[2])],
+                     tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[3])],
+                     tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[4])],
+                     tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[5])],
+                     tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[6])],
+                     tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[7])])
 
 # Read in each of the files and then bind by rows
-hourly_temp_profile_avro <- purrr::map_dfr(.x = tsd_avro_files,
+hourly_temp_profile_avro <- purrr::map_dfr(.x = lake_avro_files,
                                            ~ read.avro.tsd.profile(sc= sc,
                                                                    path = .x,
                                                                    thermistor_depths = thermistor_depths)) %>% 
   # include first QC of data
-  temp_QC(df = ., range = c(-5, 40), spike = 5, by.depth = T)  %>%
+  QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T)  %>%
   mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
 
 # Combine the three data sources
@@ -431,7 +440,7 @@ daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
   mutate(variable = 'temperature')     
  
 ##### stream temperatures #####
-temp_prt <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
+temp_streams_portal <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
   # neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
   dplyr::rename(site_id = siteID) %>%
   # horizontal position is upstream or downstream is 101 or 102 horizontal position
@@ -440,7 +449,7 @@ temp_prt <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>%
   dplyr::filter(finalQF == 0) %>%
   dplyr::collect()
 
-temp_prt <- temp_prt %>%
+temp_streams_portal <- temp_streams_portal %>%
   dplyr::mutate(time = as_date(startDateTime)) %>% 
   dplyr::group_by(time, site_id) %>%
   dplyr::summarize(temperature__observation = mean(surfWaterTempMean, na.rm = TRUE),
@@ -455,18 +464,11 @@ temp_prt <- temp_prt %>%
                names_sep = '__') %>%
   pivot_wider(names_from = stat, values_from = value) 
 
-temp_prt_QC <- temp_prt %>%
-  temp_QC(df = ., range = c(-5, 40), spike = 7, by.depth = F)  %>%
+temp_streams_portal_QC <- temp_streams_portal %>%
+  QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F)  %>%
   mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
   
-
-##### river temperature ######
-
-temp_tsd_prt <- rbind(daily_temp_surface_lakes, temp_prt) %>%
-  
-
-
-#### low latency water temperature data =========
+#==== low latency water temperature data =========
 # download the 24/48hr provisional data from the Google Cloud
 
 # Start by deleting superseded files
@@ -481,37 +483,12 @@ delete.neon.avro(months = cur_wq_month,
 # Download any new files from the Google Cloud
 download.neon.avro(months = new_month_wq, 
                    sites = unique(sites$field_site_id), 
-                   data_product = '20264',  # WQ data product
-                   path = download_location)
-
-download.neon.avro(months = new_month_wq, 
-                   sites = unique(sites$field_site_id), 
                    data_product = '20053',  # WQ data product
                    path = download_location)
 
 # Read in the new files to append to the NEONstore data
 # connect to spark locally 
 sc <- sparklyr::spark_connect(master = "local")
-
-# The variables (term names that should be kept)
-tsd_vars <- c('siteName',
-             'startDate',
-             'tsdWaterTempMean', 
-             'thermistorDepth', 
-             'tsdWaterTempExpUncert',
-             'tsdWaterTempFinalQF')
-columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
-thermistor_depths <- readr::read_csv('https://raw.githubusercontent.com/OlssonF/neon4cast-aquatics/master/thermistorDepths.csv', col_types = 'ccd')
-
-# Generate a list of files to be read
-tsd_avro_files <- paste0(download_location, '/',
-                         list.files(path = download_location,
-                                    pattern = '*20264', 
-                                    recursive = T))
-
-# Read in each of the files and then bind by rows
-tsd_avro_df <- purrr::map_dfr(.x = tsd_avro_files, ~ read.avro.tsd(sc= sc, path = .x, thermistor_depths = thermistor_depths))
-
 
 # The variables (term names that should be kept)
 prt_vars <- c('siteName',
@@ -527,11 +504,123 @@ prt_avro_files <- paste0(download_location, '/',
                                     recursive = T))
 
 # Read in each of the files and then bind by rows
-prt_avro_df <- purrr::map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc, path = .x))
+temp_streams_avros <- purrr::map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc, path = .x)) %>%
+  QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F) 
+  
+##### river temperature ######
+# For non-wadeable rivers need portal, EDI and avro data
+  
+  # Portal data
+temp_rivers_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP1.20264.001")) %>%
+  # neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
+  rename(site_id = siteID,
+         depth = thermistorDepth) %>%
+  filter(site_id %in% nonwadable_rivers) %>%
+  dplyr::select(startDateTime, site_id, tsdWaterTempMean, depth, tsdWaterTempExpUncert, tsdWaterTempFinalQF) %>%
+  filter(tsdWaterTempFinalQF == 0) %>%
+  dplyr::collect()
 
+temp_rivers_portal <- temp_rivers_portal %>%
+  dplyr::mutate(time = as_date(startDateTime)) %>% 
+  dplyr::group_by(time, site_id) %>%
+  dplyr::summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
+                   count = sum(!is.na(tsdWaterTempMean)),
+                   temperature__sample_error = se(tsdWaterTempMean),
+                   temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
+  dplyr::select(time, site_id, temperature__observation, 
+                temperature__sample_error, temperature__measure_error) %>%
+  pivot_longer(cols = !c(time, site_id), 
+               names_to = c("variable", "stat"),
+               names_sep = '__') %>%
+  pivot_wider(names_from = stat, values_from = value) 
+
+temp_rivers_portal_QC <- temp_rivers_portal %>%
+  QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F)  %>%
+  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
+
+   # EDI data
+edi_url_river <- c("https://pasta.lternet.edu/package/data/eml/edi/1185/1/fb9cf9ba62ee8e8cf94cb020175e9165",
+                   "https://pasta.lternet.edu/package/data/eml/edi/1185/1/fac068cff680ae28473c3e13dc75aa9f",
+                   "https://pasta.lternet.edu/package/data/eml/edi/1185/1/5567ad7252b598ee40f5653e7b732ff4" )
+
+river_edi_profile <- c("NEON.D03.FLNT.DP0.20005.001.01378.csv",
+                       "NEON.D03.BLWA.DP0.20005.001.01378.csv",
+                       "NEON.D03.TOMB.DP0.20005.001.01378.csv")
+
+# where is it to be saved?
+directory <- 'C:/Users/freya/Downloads'
+
+for(i in 1:length(edi_url_river)){
+  if (!file.exists(file.path(directory, "data_raw",river_edi_profile[i]))) {
+    if (!dir.exists(dirname(file.path(directory, "data_raw", 
+                                      river_edi_profile[i])))) {
+      dir.create(dirname(file.path(directory, "data_raw", 
+                                   river_edi_profile[i])))
+    }
+    download.file(edi_url_river, destfile = file.path(directory, 
+                                                      "data_raw", river_edi_profile[i]))
+  }
+}
+
+edi_data <- list.files(file.path(directory, 'data_raw'), full.names = T)
+
+edi_rivers <- c(edi_data[grepl(x = edi_data, pattern= nonwadable_rivers[1])],
+                edi_data[grepl(x = edi_data, pattern= nonwadable_rivers[2])],
+                edi_data[grepl(x = edi_data, pattern= nonwadable_rivers[3])])
+
+# The hourly data set is for the whole water column.
+temp_rivers_EDI <- purrr::map_dfr(.x = edi_rivers, ~ read.csv(file = .x)) %>%
+  rename('site_id' = siteID,
+         'observation' = waterTemp) %>%
+  mutate(startDate  = lubridate::ymd_hm(startDate),
+         time = as.Date(startDate)) %>% 
+  group_by(site_id, time) %>%
+  summarise(temperature__observation = mean(observation),
+            temperature__sample_error = se(observation)) %>%
+  pivot_longer(names_to = c('variable','stat'),
+               names_sep = '__',
+               cols = c(temperature__observation,temperature__sample_error)) %>%
+  pivot_wider(names_from = stat, values_from = value) %>%
+  mutate(measure_error = NA) %>%
+  # include first QC of data
+  QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = F)
+
+
+  # avros
+
+# Generate a list of files to be read
+tsd_avro_files <- paste0(download_location, '/',
+                         list.files(path = download_location,
+                                    pattern = '*20264', 
+                                    recursive = T))
+river_avro_files <- c(tsd_avro_files[grepl(x = tsd_avro_files, pattern= nonwadable_rivers[1])],
+                      tsd_avro_files[grepl(x = tsd_avro_files, pattern= nonwadable_rivers[2])],
+                      tsd_avro_files[grepl(x = tsd_avro_files, pattern= nonwadable_rivers[3])])
+
+# Read in each of the files and then bind by rows
+temp_rivers_avros <- purrr::map_dfr(.x = river_avro_files,
+                                           ~ read.avro.tsd(sc= sc,
+                                                           path = .x,
+                                                           thermistor_depths = thermistor_depths)) %>% 
+  # include first QC of data
+  QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = F)  %>%
+  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
+
+
+#### surface temperatures ####
 
 # Combine the avro files with the portal data
-temp_full <- dplyr::bind_rows(temp_tsd_prt, tsd_avro_df, prt_avro_df) %>%
+temp_full <- dplyr::bind_rows(# Lakes surface temperature
+                              daily_temp_surface_lakes,
+                              
+                              # Stream temperature data
+                              temp_streams_portal_QC,
+                              temp_streams_avros,
+                              
+                              # River temperature data
+                              temp_rivers_portal,
+                              temp_rivers_EDI,
+                              temp_rivers_avros) %>%
   dplyr::arrange(site_id, time)
 
 
