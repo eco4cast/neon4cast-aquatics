@@ -335,12 +335,10 @@ lake_edi_profile <- c("NEON.D03.BARC.DP0.20005.001.01378.csv",
                       "NEON.D09.PRPO.DP0.20005.001.01378.csv",
                       "NEON.D03.SUGG.DP0.20005.001.01378.csv")
 
-<<<<<<< HEAD
 fs::dir_create(EDI_file_directory) # ignores existing directories unlike dir.create()
 EDI_file_directory <- "/home/rstudio/data/aquatic_EDI"
-=======
 # Download the data
->>>>>>> f77916fe5b801dca63295491e91bdcd496dd8c82
+
 for(i in 1:length(edi_url_lake)){
   if (!file.exists(file.path(directory,  lake_edi_profile[i]))) {
     if (!dir.exists(dirname(file.path(directory, 
@@ -560,11 +558,6 @@ edi_url_river <- c("https://pasta.lternet.edu/package/data/eml/edi/1185/1/fb9cf9
 river_edi_profile <- c("NEON.D03.FLNT.DP0.20005.001.01378.csv",
                        "NEON.D03.BLWA.DP0.20005.001.01378.csv",
                        "NEON.D03.TOMB.DP0.20005.001.01378.csv")
-
-<<<<<<< HEAD
-=======
-
->>>>>>> f77916fe5b801dca63295491e91bdcd496dd8c82
 
 for(i in 1:length(edi_url_river)){
   if (!file.exists(file.path(EDI_file_directory,river_edi_profile[i]))) {
