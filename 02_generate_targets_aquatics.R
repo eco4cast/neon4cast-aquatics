@@ -317,7 +317,8 @@ hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP
   pivot_wider(names_from = stat, values_from = value) %>%
   # include first QC of data
   QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T) %>%
-  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
+  mutate(measure_error = ifelse(is.na(observation), NA, measure_error),
+         data_source = 'NEON_portal')
 
 ##### Sonde EDI data #####
 edi_url_lake <- c("https://pasta.lternet.edu/package/data/eml/edi/1071/1/7f8aef451231d5388c98eef889332a4b",
@@ -374,7 +375,8 @@ hourly_temp_profile_EDI <- purrr::map_dfr(.x = edi_lake_files, ~ read.csv(file =
   pivot_wider(names_from = stat, values_from = value) %>%
   mutate(measure_error = NA) %>%
   # include first QC of data
-  QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T)
+  QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T) %>%
+  mutate(data_source = 'MS_raw')
 
 ##### avros data #####
 # Download any new files from the Google Cloud
@@ -417,7 +419,8 @@ hourly_temp_profile_avro <- purrr::map_dfr(.x = lake_avro_files,
                                                                    thermistor_depths = thermistor_depths)) %>% 
   # include first QC of data
   QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T)  %>%
-  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
+  mutate(measure_error = ifelse(is.na(observation), NA, measure_error), 
+         data_source = 'NEON_pre-portal')
 
 # Combine the three data sources
 hourly_temp_profile_lakes <- rbind(hourly_temp_profile_portal, hourly_temp_profile_EDI, hourly_temp_profile_avro) %>%
@@ -439,7 +442,7 @@ daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
             measure_error = mean(measure_error, na.rm = T)) %>%
   mutate(variable = 'temperature')     
  
-##### stream temperatures #####
+##### Stream temperatures #####
 temp_streams_portal <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
   # neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
   dplyr::rename(site_id = siteID) %>%
@@ -510,7 +513,7 @@ temp_streams_avros <- purrr::map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc
   
 #===============================================#
 
-##### river temperature ######
+##### River temperature ######
 # For non-wadeable rivers need portal, EDI and avro data
   
   # Portal data
