@@ -9,8 +9,44 @@ source("randomWalkNullModelFunction.R")
 ####Note: Currently this is not set up to run iteratively because I am not sure how the challenge is planning on doing this.
 ####Note (continued): Hopefully someone who knows about how this will be done can use this code to do that
 
-generate_plots <- FALSE
-team_name <- "persistence"
+
+print(paste0("Running Creating persistance aquatics Forecasts at ", Sys.time()))
+
+#'Load renv.lock file that includes the versions of all the packages used
+#'You can generate using the command renv::snapshot()
+
+#' Required packages.  
+#' EFIstandards is at remotes::install_github("eco4cast/EFIstandards")
+library(tidyverse)
+library(lubridate)
+library(rjags)
+library(tidybayes)
+library(modelr)
+library(aws.s3)
+library(prov)
+library(EFIstandards)
+library(EML)
+library(jsonlite)
+
+#' set the random number for reproducible MCMC runs
+set.seed(329)
+
+#'Generate plot to visualized forecast
+generate_plots <- TRUE
+#'Is the forecast run on the Ecological Forecasting Initiative Server?
+#'Setting to TRUE published the forecast on the server.
+efi_server <- TRUE
+
+#' List of team members. Used in the generation of the metadata
+#team_list <- list(list(individualName = list(givenName = "Quinn", surName = "Thomas"), 
+#                       id = "https://orcid.org/0000-0003-1282-7825"),
+#                  list(individualName = list(givenName = "Others",  surName ="Pending")),
+#)
+
+#'Team name code
+team_name <- "persistance"
+
+#'Download target file from the server
 
 download.file("https://data.ecoforecast.org/neon4cast-targets/aquatics/aquatics-targets.csv.gz",
               "aquatics-targets.csv.gz")
@@ -175,5 +211,6 @@ write_csv(forecast_saved, forecast_file_name)
 neon4cast::submit(forecast_file = forecast_file_name, 
                   metadata = NULL, 
                   ask = FALSE)
+
 
 unlink(forecast_file_name)

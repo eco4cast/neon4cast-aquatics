@@ -3,6 +3,9 @@ message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 avro_file_directory <- "/home/rstudio/data/aquatic_avro"
 EDI_file_directory <- "/home/rstudio/data/aquatic_EDI"
 
+Sys.setenv("NEONSTORE_HOME" = "/home/rstudio/data/neonstore")
+
+
 
 # Sys.setenv("NEONSTORE_HOME" = "/home/rstudio/data/neonstore") #Sys.setenv("NEONSTORE_HOME" = "/efi_neon_challenge/neonstore")
 #Sys.setenv("NEONSTORE_DB" = "home/rstudio/data/neonstore")    #Sys.setenv("NEONSTORE_DB" = "/efi_neon_challenge/neonstore")
@@ -37,6 +40,7 @@ stream_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Wadeable
 #======================================================#
 
 #message("Downloading: DP1.20288.001")
+
 #neonstore::neon_download("DP1.20288.001",site = sites$field_site_id, type = "basic")
 #neonstore::neon_store(table = "waq_instantaneous", n = 50)
 #message("Downloading: DP1.20264.001")
@@ -673,20 +677,10 @@ targets_long <- dplyr::bind_rows(wq_cleaned, temp_cleaned) %>%
 ### Write out the targets
 # write_csv(targets_long, "aquatics-targets.csv.gz")
 
-readRenviron("~/.Renviron") # compatible with littler
-## Publish the targets to EFI.  Assumes aws.s3 env vars are configured.
-source("../challenge-ci/publish.R")
-publish(code = "02_generate_targets_aquatics.R",
-        data_out = "aquatics-targets.csv.gz",
-        prefix = "aquatics/",
-        bucket = "neon4cast-targets",
-        provdb = "prov.tsv",
-        registries = "https://hash-archive.carlboettiger.info")
-
 ### Write the disaggregated lake data
 readRenviron("~/.Renviron") # compatible with littler
 ## Publish the targets to EFI.  Assumes aws.s3 env vars are configured.
-source("../challenge-ci/publish.R")
+source("../challenge-ci/R/publish.R")
 publish(code = "02_generate_targets_aquatics.R",
         data_out = "aquatics-targets (expanded).csv.gz",
         prefix = "aquatics/",
