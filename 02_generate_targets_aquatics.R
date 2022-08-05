@@ -3,7 +3,9 @@ message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 avro_file_directory <- "/home/rstudio/data/aquatic_avro"
 EDI_file_directory <- "/home/rstudio/data/aquatic_EDI"
 
+readRenviron("~/.Renviron") # compatible with littler
 Sys.setenv("NEONSTORE_HOME" = "/home/rstudio/data/neonstore")
+
 
 
 
@@ -31,7 +33,7 @@ source('R/data_processing.R')
 
 message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 
-sites <- read_csv("https://raw.githubusercontent.com/OlssonF/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20220727.csv")
+sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20220727.csv")
 
 nonwadable_rivers <- sites$field_site_id[(which(sites$field_site_subtype == "Non-wadeable River"))]
 lake_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Lake"))]
@@ -340,17 +342,16 @@ lake_edi_profile <- c("NEON.D03.BARC.DP0.20005.001.01378.csv",
                       "NEON.D03.SUGG.DP0.20005.001.01378.csv")
 
 fs::dir_create(EDI_file_directory) # ignores existing directories unlike dir.create()
-EDI_file_directory <- "/home/rstudio/data/aquatic_EDI"
 # Download the data
 
 for(i in 1:length(edi_url_lake)){
-  if (!file.exists(file.path(directory,  lake_edi_profile[i]))) {
-    if (!dir.exists(dirname(file.path(directory, 
+  if (!file.exists(file.path(EDI_file_directory,  lake_edi_profile[i]))) {
+    if (!dir.exists(dirname(file.path(EDI_file_directory, 
                                       lake_edi_profile[i])))) {
-      dir.create(dirname(file.path(directory, 
+      dir.create(dirname(file.path(EDI_file_directory, 
                                    lake_edi_profile[i])))
     }
-    download.file(edi_url_lake[i], destfile = file.path(directory, lake_edi_profile[i]))
+    download.file(edi_url_lake[i], destfile = file.path(EDI_file_directory, lake_edi_profile[i]))
   }
 }
 
@@ -675,14 +676,23 @@ targets_long <- dplyr::bind_rows(wq_cleaned, temp_cleaned) %>%
                 measure_error = ifelse(is.nan(measure_error), NA, measure_error))
 
 ### Write out the targets
-# write_csv(targets_long, "aquatics-targets.csv.gz")
+write_csv(targets_long, "aquatics-targets.csv.gz")
 
 ### Write the disaggregated lake data
+write_csv(hourly_temp_profile_lakes, "aquatics-expanded-observations.csv.gz")
+
 readRenviron("~/.Renviron") # compatible with littler
 ## Publish the targets to EFI.  Assumes aws.s3 env vars are configured.
 source("../challenge-ci/R/publish.R")
 publish(code = "02_generate_targets_aquatics.R",
-        data_out = "aquatics-targets (expanded).csv.gz",
+        data_out = "aquatics-targets.csv.gz",
+        prefix = "aquatics/",
+        bucket = "neon4cast-targets",
+        provdb = "prov.tsv",
+        registries = "https://hash-archive.carlboettiger.info")
+
+publish(code = "02_generate_targets_aquatics.R",
+        data_out = "aquatics-expanded-observations.csv.gz",
         prefix = "aquatics/",
         bucket = "neon4cast-targets",
         provdb = "prov.tsv",
