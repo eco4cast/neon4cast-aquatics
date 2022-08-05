@@ -3,9 +3,6 @@ message(paste0("Running Creating Aquatics Targets at ", Sys.time()))
 avro_file_directory <- "/home/rstudio/data/aquatic_avro"
 EDI_file_directory <- "/home/rstudio/data/aquatic_EDI"
 
-neon <- arrow::s3_bucket("neon4cast-targets/neon",
-                         endpoint_override = "data.ecoforecast.org",
-                         anonymous = TRUE)
 
 # Sys.setenv("NEONSTORE_HOME" = "/home/rstudio/data/neonstore") #Sys.setenv("NEONSTORE_HOME" = "/efi_neon_challenge/neonstore")
 #Sys.setenv("NEONSTORE_DB" = "home/rstudio/data/neonstore")    #Sys.setenv("NEONSTORE_DB" = "/efi_neon_challenge/neonstore")
@@ -59,7 +56,9 @@ stream_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Wadeable
 
 
 #### Generate WQ table #############
-
+neon <- arrow::s3_bucket("neon4cast-targets/neon",
+                         endpoint_override = "data.ecoforecast.org",
+                         anonymous = TRUE)
 # list tables with `neon$ls()`
 wq_portal <- arrow::open_dataset(neon$path("waq_instantaneous-basic-DP1.20288.001")) %>%   # waq_instantaneous
   dplyr::filter(siteID %in% sites$field_site_id) %>%
@@ -72,9 +71,10 @@ wq_portal <- arrow::open_dataset(neon$path("waq_instantaneous-basic-DP1.20288.00
                 chla = as.numeric(chlorophyll),
                 chlorophyllExpUncert = as.numeric(chlorophyllExpUncert)) %>%
   rename(site_id = siteID) %>% 
-  dplyr::collect()
-wq_portal <- wq_portal %>% # sensor depth of NA == surface?
   dplyr::filter(((sensorDepth > 0 & sensorDepth < 1)| is.na(sensorDepth))) %>%
+  dplyr::collect()
+
+wq_portal <- wq_portal %>% # sensor depth of NA == surface?
   dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
   dplyr::mutate(time = as_date(startDateTime)) %>%
   
@@ -84,18 +84,16 @@ wq_portal <- wq_portal %>% # sensor depth of NA == surface?
                 chla = ifelse(chlorophyllFinalQF == 0, chla, NA)) %>% 
   dplyr::group_by(site_id, time) %>%
   dplyr::summarize(oxygen__observation = mean(dissolvedOxygen, na.rm = TRUE),
-                   sensorDepth = mean(sensorDepth, na.rm = TRUE),
                    chla__observation = mean(chla, na.rm = TRUE),
-                   
                    oxygen__sample_error = se(dissolvedOxygen),
                    chla__sample_error = se(chla),
-                   #why only using the count of non-NA in DO?
                    count = sum(!is.na(dissolvedOxygen)),
                    chla__measure_error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
                    oxygen__measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
-  #dplyr::filter(count > 44) %>% 
-  dplyr::select(time, site_id, oxygen__observation, chla__observation, 
-                oxygen__sample_error, chla__sample_error, oxygen__measure_error, chla__measure_error) %>% 
+  dplyr::select(time, site_id, 
+                oxygen__observation, chla__observation, 
+                oxygen__sample_error, chla__sample_error, 
+                oxygen__measure_error, chla__measure_error) %>% 
   pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "__") %>%
   pivot_wider(names_from = stat, values_from = value) %>%
   filter(!(variable == "chla" & site_id %in% stream_sites))
@@ -107,8 +105,7 @@ wq_portal <- wq_portal %>% # sensor depth of NA == surface?
 
 # where should these files be saved?
 
-download_location <- avro_file_directory
-fs::dir_create(download_location) # ignores existing directories unlike dir.create()
+fs::dir_create(avro_file_directory) # ignores existing directories unlike dir.create()
 
 # need to figure out which month's data are required
 # what is in the NEON store db?
@@ -124,14 +121,14 @@ new_month_wq <- unique(format(c((as.Date(max(wq_portal$time)) %m+% months(1)), (
 
 delete.neon.avro(months = cur_wq_month,
                  sites = unique(sites$field_site_id), 
-                 path = download_location)
+                 path = avro_file_directory)
 
 
 # Download any new files from the Google Cloud
 download.neon.avro(months = new_month_wq, 
-                   sites = unique(wq_portal$site_id), #unique(sites$field_site_id), 
+                   sites = unique(sites$field_site_id), 
                    data_product = '20288',  # WQ data product
-                   path = download_location)
+                   path = avro_file_directory)
 
 # Read in the new files to append to the NEONstore data
 # connect to spark locally 
@@ -149,8 +146,8 @@ wq_vars <- c('siteName',
 columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
 
 # Generate a list of files to be read
-wq_avro_files <- paste0(download_location, '/',
-                        list.files(path = paste0(download_location), 
+wq_avro_files <- paste0(avro_file_directory, '/',
+                        list.files(path = paste0(avro_file_directory), 
                                    pattern = '*20288', 
                                    recursive = T))
 
@@ -336,24 +333,22 @@ lake_edi_profile <- c("NEON.D03.BARC.DP0.20005.001.01378.csv",
                       "NEON.D09.PRPO.DP0.20005.001.01378.csv",
                       "NEON.D03.SUGG.DP0.20005.001.01378.csv")
 
-# Where are the files to be saved?
-directory <- 'C:/Users/freya/Downloads'
-
+fs::dir_create(EDI_file_directory) # ignores existing directories unlike dir.create()
+EDI_file_directory <- "/home/rstudio/data/aquatic_EDI"
 for(i in 1:length(edi_url_lake)){
-  if (!file.exists(file.path(directory, "data_raw", lake_edi_profile[i]))) {
-    if (!dir.exists(dirname(file.path(directory, "data_raw", 
+  if (!file.exists(file.path(directory,  lake_edi_profile[i]))) {
+    if (!dir.exists(dirname(file.path(directory, 
                                       lake_edi_profile[i])))) {
-      dir.create(dirname(file.path(directory, "data_raw", 
+      dir.create(dirname(file.path(directory, 
                                    lake_edi_profile[i])))
     }
-    download.file(edi_url_lake, destfile = file.path(directory, 
-                                                     "data_raw", lake_edi_profile[i]))
+    download.file(edi_url_lake[i], destfile = file.path(directory, lake_edi_profile[i]))
   }
 }
 
 
 # List all the files in the EDI directory 
-edi_data <- list.files(file.path(directory, 'data_raw'), full.names = T)
+edi_data <- list.files(file.path(EDI_file_directory), full.names = T)
 # Get the lake sites subset
 edi_lake_files <- c(edi_data[grepl(x = edi_data, pattern= lake_sites[1])],
                      edi_data[grepl(x = edi_data, pattern= lake_sites[2])],
@@ -386,7 +381,7 @@ hourly_temp_profile_EDI <- purrr::map_dfr(.x = edi_lake_files, ~ read.csv(file =
 download.neon.avro(months = new_month_wq, 
                    sites = unique(sites$field_site_id), 
                    data_product = '20264',  # TSD data product
-                   path = download_location)
+                   path = avro_file_directory)
 
 sc <- sparklyr::spark_connect(master = "local")
 
@@ -403,8 +398,8 @@ thermistor_depths <- readr::read_csv('https://raw.githubusercontent.com/OlssonF/
 
 
 # Generate a list of files to be read
-tsd_avro_files <- paste0(download_location, '/',
-                         list.files(path = download_location,
+tsd_avro_files <- paste0(avro_file_directory, '/',
+                         list.files(path = avro_file_directory,
                                     pattern = '*20264', 
                                     recursive = T))
 lake_avro_files <- c(tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[1])],
@@ -484,13 +479,13 @@ temp_streams_portal_QC <- temp_streams_portal %>%
 
 delete.neon.avro(months = cur_wq_month,
                  sites = unique(sites$field_site_id),
-                 path = download_location)
+                 path = avro_file_directory)
 
 # Download any new files from the Google Cloud
 download.neon.avro(months = new_month_wq, 
                    sites = unique(sites$field_site_id), 
                    data_product = '20053',  # WQ data product
-                   path = download_location)
+                   path = avro_file_directory)
 
 # Read in the new files to append to the NEONstore data
 # connect to spark locally 
@@ -504,8 +499,8 @@ prt_vars <- c('siteName',
               'finalQF')
 
 # Generate a list of files to be read
-prt_avro_files <- paste0(download_location, '/',
-                         list.files(path = download_location,
+prt_avro_files <- paste0(avro_file_directory, '/',
+                         list.files(path = avro_file_directory,
                                     pattern = '*20053', 
                                     recursive = T))
 
@@ -555,22 +550,19 @@ river_edi_profile <- c("NEON.D03.FLNT.DP0.20005.001.01378.csv",
                        "NEON.D03.BLWA.DP0.20005.001.01378.csv",
                        "NEON.D03.TOMB.DP0.20005.001.01378.csv")
 
-# where is it to be saved?
-directory <- 'C:/Users/freya/Downloads'
 
 for(i in 1:length(edi_url_river)){
-  if (!file.exists(file.path(directory, "data_raw",river_edi_profile[i]))) {
-    if (!dir.exists(dirname(file.path(directory, "data_raw", 
+  if (!file.exists(file.path(EDI_file_directory,river_edi_profile[i]))) {
+    if (!dir.exists(dirname(file.path(EDI_file_directory, 
                                       river_edi_profile[i])))) {
-      dir.create(dirname(file.path(directory, "data_raw", 
+      dir.create(dirname(file.path(EDI_file_directory, 
                                    river_edi_profile[i])))
     }
-    download.file(edi_url_river, destfile = file.path(directory, 
-                                                      "data_raw", river_edi_profile[i]))
+    download.file(edi_url_river[i], destfile = file.path(EDI_file_directory, river_edi_profile[i]))
   }
 }
 
-edi_data <- list.files(file.path(directory, 'data_raw'), full.names = T)
+edi_data <- list.files(file.path(EDI_file_directory), full.names = T)
 
 edi_rivers <- c(edi_data[grepl(x = edi_data, pattern= nonwadable_rivers[1])],
                 edi_data[grepl(x = edi_data, pattern= nonwadable_rivers[2])],
@@ -597,8 +589,8 @@ temp_rivers_EDI <- purrr::map_dfr(.x = edi_rivers, ~ read.csv(file = .x)) %>%
   # avros
 
 # Generate a list of files to be read
-tsd_avro_files <- paste0(download_location, '/',
-                         list.files(path = download_location,
+tsd_avro_files <- paste0(avro_file_directory, '/',
+                         list.files(path = avro_file_directory,
                                     pattern = '*20264', 
                                     recursive = T))
 river_avro_files <- c(tsd_avro_files[grepl(x = tsd_avro_files, pattern= nonwadable_rivers[1])],
