@@ -663,7 +663,7 @@ targets_long <- dplyr::bind_rows(wq_cleaned, temp_cleaned) %>%
                 measure_error = ifelse(is.nan(measure_error), NA, measure_error))
 
 ### Write out the targets
-write_csv(targets_long, "aquatics-targets.csv.gz")
+# write_csv(targets_long, "aquatics-targets.csv.gz")
 
 readRenviron("~/.Renviron") # compatible with littler
 ## Publish the targets to EFI.  Assumes aws.s3 env vars are configured.
@@ -674,5 +674,17 @@ publish(code = "02_generate_targets_aquatics.R",
         bucket = "neon4cast-targets",
         provdb = "prov.tsv",
         registries = "https://hash-archive.carlboettiger.info")
+
+### Write the disaggregated lake data
+readRenviron("~/.Renviron") # compatible with littler
+## Publish the targets to EFI.  Assumes aws.s3 env vars are configured.
+source("../challenge-ci/publish.R")
+publish(code = "02_generate_targets_aquatics.R",
+        data_out = "aquatics-targets (expanded).csv.gz",
+        prefix = "aquatics/",
+        bucket = "neon4cast-targets",
+        provdb = "prov.tsv",
+        registries = "https://hash-archive.carlboettiger.info")
+
 
 message(paste0("Completed Aquatics Target at ", Sys.time()))
