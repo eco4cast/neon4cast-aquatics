@@ -621,7 +621,12 @@ temp_full <- dplyr::bind_rows(# Lakes surface temperature
                               temp_rivers_portal,
                               temp_rivers_EDI,
                               temp_rivers_avros) %>%
-  dplyr::arrange(site_id, time)
+  dplyr::arrange(site_id, time) %>%
+  group_by(site_id, time) %>%
+  summarise(observation = mean(observation, na.rm = T),
+            sample_error = mean(sample_error, na.rm = T),
+            measure_error = mean(measure_error, na.rm = T)) %>%
+  mutate(variable = 'temperature')
 
 
 #### Temp QC protocol=================
