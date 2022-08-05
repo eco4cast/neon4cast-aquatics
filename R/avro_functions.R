@@ -42,11 +42,11 @@ download.neon.avro <- function(months, sites, data_product, path) {
 # delete the superseded files
 delete.neon.avro <- function(months, sites, path) {
   for (i in 1:length(sites)) {
-    superseded <-  dir(path = paste0(path, 'aquatic_avro/site=', sites[i]),
+    superseded <-  dir(path = paste0(path, '/site=', sites[i]),
                        pattern = months)
     
     if (length(superseded) != 0) {
-      file.remove(paste0(path,'aquatic_avro/site=', sites[i], '/',superseded))
+      file.remove(paste0(path,'/site=', sites[i], '/',superseded))
     }
   }
 }
