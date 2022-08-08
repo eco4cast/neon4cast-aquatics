@@ -39,11 +39,13 @@ team_name <- "climatology"
 
 #'Read in target file.  The guess_max is specified because there could be a lot of
 #'NA values at the beginning of the file
-#targets <- read_csv("https://data.ecoforecast.org/targets/aquatics/aquatics-targets.csv.gz", guess_max = 10000)
-targets <- read_csv("aquatics-targets.csv.gz")
+targets <- read_csv("https://data.ecoforecast.org/neon4cast-targets/aquatics/aquatics-targets.csv.gz", guess_max = 10000)
+#targets <- read_csv("aquatics-targets.csv.gz")
 
 
 sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20210928.csv")
+
+site_names <- c(sites$field_site_id, c("SUGG", "PRLA", "PRPO", "LIRO"))
 
 site_names <- c(sites$field_site_id, c("SUGG", "PRLA", "PRPO", "LIRO"))
 
@@ -51,8 +53,8 @@ site_names <- c(sites$field_site_id, c("SUGG", "PRLA", "PRPO", "LIRO"))
 target_clim <- targets %>%  
   mutate(doy = yday(time)) %>% 
   group_by(doy, site_id, variable) %>% 
-  summarise(mean = mean(observation, na.rm = TRUE),
-            sd = sd(observation, na.rm = TRUE),
+  summarise(mean = mean(observed, na.rm = TRUE),
+            sd = sd(observed, na.rm = TRUE),
             .groups = "drop") %>% 
   mutate(mean = ifelse(is.nan(mean), NA, mean))
 

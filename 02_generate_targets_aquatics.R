@@ -61,7 +61,7 @@ stream_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Wadeable
 # temp_prt <- neonstore::neon_table("TSW_30min", site = stream_sites) 
 
 
-#### Generate WQ table #############
+message("#### Generate WQ table #############")
 neon <- arrow::s3_bucket("neon4cast-targets/neon",
                          endpoint_override = "data.ecoforecast.org",
                          anonymous = TRUE)
@@ -79,6 +79,8 @@ wq_portal <- arrow::open_dataset(neon$path("waq_instantaneous-basic-DP1.20288.00
   rename(site_id = siteID) %>% 
   dplyr::filter(((sensorDepth > 0 & sensorDepth < 1)| is.na(sensorDepth))) %>%
   dplyr::collect()
+
+print("here")
 
 wq_portal <- wq_portal %>% # sensor depth of NA == surface?
   dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
@@ -105,9 +107,8 @@ wq_portal <- wq_portal %>% # sensor depth of NA == surface?
   filter(!(variable == "chla" & site_id %in% stream_sites))
   
 #====================================================#
-
 ##### low latency WQ data =======
-# download the 24/48hr provisional data from the Google Cloud
+message("# download the 24/48hr provisional data from the Google Cloud")
 
 # where should these files be saved?
 
@@ -168,7 +169,7 @@ wq_full <- dplyr::bind_rows(wq_portal, wq_avro_df) %>%
 
 #==============================#
 
-##### WQ QC protocol =======
+message("##### WQ QC protocol =======")
 # additional QC steps implemented (FO, 2022-07-13)
 ##### check 1 Gross range tests on DO and chlorophyll
 # DO ranges for each sensor and each season
@@ -218,8 +219,8 @@ wq_cleaned <- wq_full %>%
                               variable == "oxygen", NA, sample_error))
 
 #===============================================#
-#### Generate hourly temperature profiles for lake #############
-##### NEON portal data #####
+message("#### Generate hourly temperature profiles for lake #############")
+message("##### NEON portal data #####")
 hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP1.20264.001")) %>%
   # neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
   rename(site_id = siteID,
@@ -326,7 +327,7 @@ hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP
   mutate(measure_error = ifelse(is.na(observation), NA, measure_error),
          data_source = 'NEON_portal')
 
-##### Sonde EDI data #####
+message("##### Sonde EDI data #####")
   # Only 6 lake sites available on EDI
 edi_url_lake <- c("https://pasta.lternet.edu/package/data/eml/edi/1071/1/7f8aef451231d5388c98eef889332a4b",
                   "https://pasta.lternet.edu/package/data/eml/edi/1071/1/2c8893684d94b9a52394060a76cab798", 
@@ -386,8 +387,8 @@ hourly_temp_profile_EDI <- purrr::map_dfr(.x = edi_lake_files, ~ read.csv(file =
   QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T) %>%
   mutate(data_source = 'MS_raw')
 
-##### avros data #####
-# Download any new files from the Google Cloud
+message("##### avros data #####")
+message("# Download any new files from the Google Cloud")
 download.neon.avro(months = new_month_wq, 
                    sites = unique(sites$field_site_id), 
                    data_product = '20264',  # TSD data product
@@ -420,7 +421,7 @@ lake_avro_files <- c(tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_site
                      tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[6])],
                      tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[7])])
 
-# Read in each of the files and then bind by rows
+message("# Read in each of the files and then bind by rows")
 hourly_temp_profile_avro <- purrr::map_dfr(.x = lake_avro_files,
                                            ~ read.avro.tsd.profile(sc= sc,
                                                                    path = .x,
@@ -434,13 +435,13 @@ hourly_temp_profile_avro <- purrr::map_dfr(.x = lake_avro_files,
 hourly_temp_profile_lakes <- rbind(hourly_temp_profile_portal, hourly_temp_profile_EDI, hourly_temp_profile_avro) %>%
   arrange(time, site_id, depth) %>%
   group_by(time, site_id, depth) %>%
-  summarise(observation = mean(observation, na.rm = T),
+  summarise(observed = mean(observation, na.rm = T),
             sample_error = mean(sample_error, na.rm = T),
             measure_error = mean(measure_error, na.rm = T))
 
 #======================================================#
 
-#### Generate surface (< 1 m) temperature #############
+message("#### Generate surface (< 1 m) temperature #############")
 ###### Lake temperatures #####
 # Daily surface lake temperatures generated from the hourly profiles created above
 daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
@@ -452,7 +453,7 @@ daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
             measure_error = mean(measure_error, na.rm = T)) %>%
   mutate(variable = 'temperature')     
  
-##### Stream temperatures #####
+message("##### Stream temperatures #####")
 temp_streams_portal <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
   # neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
   dplyr::rename(site_id = siteID) %>%
@@ -483,7 +484,7 @@ temp_streams_portal_QC <- temp_streams_portal %>%
 #===========================================#
   
     #### avros
-# download the 24/48hr provisional data from the Google Cloud
+message("#download the 24/48hr provisional data from the Google Cloud")
 
 # Start by deleting superseded files
 # Files that have been superseded by the NEON store files can be deleted from the relevant repository
@@ -524,7 +525,7 @@ temp_streams_avros <- purrr::map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc
   
 #===============================================#
 
-##### River temperature ######
+message("##### River temperature ######")
 # For non-wadeable rivers need portal, EDI and avro data
   
   # Portal data
@@ -601,7 +602,7 @@ temp_rivers_EDI <- purrr::map_dfr(.x = edi_rivers, ~ read.csv(file = .x)) %>%
 
   # avros
 
-# Generate a list of files to be read
+message("Generate a list of nonwadable_rivers avro files to be read")
 tsd_avro_files <- paste0(avro_file_directory, '/',
                          list.files(path = avro_file_directory,
                                     pattern = '*20264', 
@@ -620,7 +621,7 @@ temp_rivers_avros <- purrr::map_dfr(.x = river_avro_files,
   mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
 #===========================================#
 
-#### surface temperatures ####
+message("#### surface temperatures ####")
 
 # Combine the avro files with the portal data
 temp_full <- dplyr::bind_rows(# Lakes surface temperature
@@ -671,7 +672,7 @@ temp_cleaned <-
 #### Targets==========================
 targets_long <- dplyr::bind_rows(wq_cleaned, temp_cleaned) %>%
   dplyr::arrange(site_id, time, variable) %>%
-  dplyr::mutate(observation = ifelse(is.nan(observation), NA, observation),
+  dplyr::mutate(observed = ifelse(is.nan(observation), NA, observation),
                 sample_error = ifelse(is.nan(sample_error), NA, sample_error),
                 measure_error = ifelse(is.nan(measure_error), NA, measure_error))
 
@@ -698,5 +699,6 @@ publish(code = "02_generate_targets_aquatics.R",
         provdb = "prov.tsv",
         registries = "https://hash-archive.carlboettiger.info")
 
+system2("curl", "https://hc-ping.com/1267b13e-8980-4ddf-8aaa-21aa7e15081c")
 
 message(paste0("Completed Aquatics Target at ", Sys.time()))
