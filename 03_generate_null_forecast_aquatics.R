@@ -9,49 +9,13 @@ source("randomWalkNullModelFunction.R")
 ####Note: Currently this is not set up to run iteratively because I am not sure how the challenge is planning on doing this.
 ####Note (continued): Hopefully someone who knows about how this will be done can use this code to do that
 
-
-print(paste0("Running Creating persistance aquatics Forecasts at ", Sys.time()))
-
-#'Load renv.lock file that includes the versions of all the packages used
-#'You can generate using the command renv::snapshot()
-
-#' Required packages.  
-#' EFIstandards is at remotes::install_github("eco4cast/EFIstandards")
-library(tidyverse)
-library(lubridate)
-library(rjags)
-library(tidybayes)
-library(modelr)
-library(aws.s3)
-library(prov)
-library(EFIstandards)
-library(EML)
-library(jsonlite)
-
-#' set the random number for reproducible MCMC runs
-set.seed(329)
-
-#'Generate plot to visualized forecast
-generate_plots <- TRUE
-#'Is the forecast run on the Ecological Forecasting Initiative Server?
-#'Setting to TRUE published the forecast on the server.
-efi_server <- TRUE
-
-#' List of team members. Used in the generation of the metadata
-#team_list <- list(list(individualName = list(givenName = "Quinn", surName = "Thomas"), 
-#                       id = "https://orcid.org/0000-0003-1282-7825"),
-#                  list(individualName = list(givenName = "Others",  surName ="Pending")),
-#)
-
-#'Team name code
-team_name <- "persistance"
-
-#'Download target file from the server
+generate_plots <- FALSE
+team_name <- "persistence"
 
 download.file("https://data.ecoforecast.org/neon4cast-targets/aquatics/aquatics-targets.csv.gz",
               "aquatics-targets.csv.gz")
 
-siteDat <- read.csv("aquatics-targets.csv.gz",header=TRUE)
+phenoDat <- read_csv("aquatics-targets.csv.gz")
 sites <- unique(as.character(phenoDat$site_id))
 target_variables <- c("temperature","oxygen", "chla")
 
@@ -89,8 +53,8 @@ for(i in 1:length(target_variables)){
     
     forecast_length <- 35
     
-    siteAquaticDat <- siteDat[siteDat$site_id==sites[s],]
-    siteAquaticDat$time <- lubridate::as_date(siteAquaticDat$time)
+    sitePhenoDat <- phenoDat[phenoDat$site_id==sites[s],]
+    sitePhenoDat$time <- lubridate::as_date(sitePhenoDat$time)
     
     #sitePhenoDat <- sitePhenoDat %>% 
     #  pivot_longer(cols = c(all_of(target_variables), all_of(target_variables_sd)), names_to = "variable", values_to = "values")
@@ -101,98 +65,100 @@ for(i in 1:length(target_variables)){
     sitePhenoDat_variable <- sitePhenoDat %>% 
       filter(variable == target_variables[i])
     
-    #full_time <- tibble::tibble(time = seq(min(sitePhenoDat$time), max(sitePhenoDat$time) + lubridate::days(forecast_length), by = "1 day"))
-    full_time <- tibble::tibble(time = seq(min(sitePhenoDat$time), Sys.Date()  + lubridate::days(forecast_length), by = "1 day"))
-    forecast_start_index <- which(full_time$time == max(sitePhenoDat$time) + lubridate::days(1))
-    
-    d <- tibble::tibble(time = sitePhenoDat_variable$time,
-                        p=as.numeric(sitePhenoDat_variable$values),
-                        p.sd=as.numeric(sitePhenoDat_sd$values))
-    d <- dplyr::full_join(d, full_time)
-    
-    ggplot(d, aes(x = time, y = p)) +
-      geom_point()
-    
-    #gap fill the missing precisions by assigning them the average sd for the site
-    d$p.sd[!is.finite(d$p.sd)] <- NA
-    d$p.sd[is.na(d$p.sd)] <- mean(d$p.sd,na.rm=TRUE)
-    d$p.sd[d$p.sd == 0.0] <- min(d$p.sd[d$p.sd != 0.0])
-    d$N <- length(d$p)
-    data <- list(y = d$p,
-                 sd_obs = d$p.sd,
-                 N = length(d$p),
-                 x_ic = 0.3)
-    
-    init_x <- approx(x = d$time[!is.na(d$p)], y = d$p[!is.na(d$p)], xout = d$time, rule = 2)$y
-    
-    #Initialize parameters
-    nchain = 3
-    chain_seeds <- c(200,800,1400)
-    init <- list()
-    for(j in 1:nchain){
-      init[[j]] <- list(sd_add = sd(diff(data$y[!is.na(data$y)])),
-                        .RNG.name = "base::Wichmann-Hill",
-                        .RNG.seed = chain_seeds[j],
-                        x = init_x)
-    }
-    
-    
-    
-    j.model   <- jags.model(file = textConnection(RandomWalk),
-                            data = data,
-                            inits = init,
-                            n.chains = 3)
-    
-    
-    #Run JAGS model as the burn-in
-    jags.out   <- coda.samples(model = j.model,variable.names = c("sd_add"), n.iter = 1000)
-    
-    #Run JAGS model again and sample from the posteriors
-    m   <- coda.samples(model = j.model,
-                        variable.names = c("x","sd_add", "y"),
-                        n.iter = 2000,
-                        thin = 1)
-    
-    #Use TidyBayes package to clean up the JAGS output
-    model_output <- m %>%
-      spread_draws(y[day]) %>%
-      filter(.chain == 1) %>%
-      rename(ensemble = .iteration) %>%
-      mutate(time = full_time$time[day]) %>%
-      ungroup() %>%
-      select(time, y, ensemble)
-    
-    if(generate_plots){
-      #Pull in the observed data for plotting
-      obs <- tibble(time = d$time,
-                    obs = d$p) %>% 
-        filter(time >= max(sitePhenoDat$time))
+    if(length(which(!is.na(sitePhenoDat_variable$observed)))){
       
-      #Post past and future
-      model_output %>%
-        group_by(time) %>%
-        summarise(mean = mean(y),
-                  upper = quantile(y, 0.975),
-                  lower = quantile(y, 0.025),.groups = "drop") %>%
-        filter(time >= max(sitePhenoDat$time) ) %>%
-        ggplot(aes(x = time, y = mean)) +
-        geom_line() +
-        geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, color = "lightblue", fill = "lightblue") +
-        geom_point(data = obs, aes(x = time, y = obs), color = "red") +
-        labs(x = "Date", y = "gcc_90")
+      #full_time <- tibble::tibble(time = seq(min(sitePhenoDat$time), max(sitePhenoDat$time) + lubridate::days(forecast_length), by = "1 day"))
+      full_time <- tibble::tibble(time = seq(min(sitePhenoDat$time), Sys.Date()  + lubridate::days(forecast_length), by = "1 day"))
+      forecast_start_index <- which(full_time$time == max(sitePhenoDat$time) + lubridate::days(1))
       
-      ggsave(paste0("aquatic_",sites[s],"_figure.pdf"), device = "pdf")
+      d <- tibble::tibble(time = sitePhenoDat_variable$time,
+                          p=as.numeric(sitePhenoDat_variable$observed),
+                          p.sd=as.numeric(sitePhenoDat_variable$measure_error))
+      d <- dplyr::full_join(d, full_time)
+      
+      ggplot(d, aes(x = time, y = p)) +
+        geom_point()
+      
+      #gap fill the missing precisions by assigning them the average sd for the site
+      d$p.sd[!is.finite(d$p.sd)] <- NA
+      d$p.sd[is.na(d$p.sd)] <- mean(d$p.sd,na.rm=TRUE)
+      d$p.sd[d$p.sd == 0.0] <- min(d$p.sd[d$p.sd != 0.0])
+      d$N <- length(d$p)
+      data <- list(y = d$p,
+                   sd_obs = d$p.sd,
+                   N = length(d$p),
+                   x_ic = 0.3)
+      
+      init_x <- approx(x = d$time[!is.na(d$p)], y = d$p[!is.na(d$p)], xout = d$time, rule = 2)$y
+      
+      #Initialize parameters
+      nchain = 3
+      chain_seeds <- c(200,800,1400)
+      init <- list()
+      for(j in 1:nchain){
+        init[[j]] <- list(sd_add = sd(diff(data$y[!is.na(data$y)])),
+                          .RNG.name = "base::Wichmann-Hill",
+                          .RNG.seed = chain_seeds[j],
+                          x = init_x)
+      }
+      
+      
+      
+      j.model   <- jags.model(file = textConnection(RandomWalk),
+                              data = data,
+                              inits = init,
+                              n.chains = 3)
+      
+      
+      #Run JAGS model as the burn-in
+      jags.out   <- coda.samples(model = j.model,variable.names = c("sd_add"), n.iter = 1000)
+      
+      #Run JAGS model again and sample from the posteriors
+      m   <- coda.samples(model = j.model,
+                          variable.names = c("x","sd_add", "y"),
+                          n.iter = 2000,
+                          thin = 1)
+      
+      #Use TidyBayes package to clean up the JAGS output
+      model_output <- m %>%
+        spread_draws(y[day]) %>%
+        filter(.chain == 1) %>%
+        rename(ensemble = .iteration) %>%
+        mutate(time = full_time$time[day]) %>%
+        ungroup() %>%
+        select(time, y, ensemble)
+      
+      if(generate_plots){
+        #Pull in the observed data for plotting
+        obs <- tibble(time = d$time,
+                      obs = d$p) %>% 
+          filter(time >= max(sitePhenoDat$time))
+        
+        #Post past and future
+        model_output %>%
+          group_by(time) %>%
+          summarise(mean = mean(y),
+                    upper = quantile(y, 0.975),
+                    lower = quantile(y, 0.025),.groups = "drop") %>%
+          filter(time >= max(sitePhenoDat$time) ) %>%
+          ggplot(aes(x = time, y = mean)) +
+          geom_line() +
+          geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2, color = "lightblue", fill = "lightblue") +
+          geom_point(data = obs, aes(x = time, y = obs), color = "red") +
+          labs(x = "Date", y = "gcc_90")
+        
+        ggsave(paste0("phenology_",sites[s],"_figure.pdf"), device = "pdf")
+      }
+      
+      #Filter only the forecasted dates and add columns for required variable
+      forecast_saved_tmp <- model_output %>%
+        filter(time >= start_forecast) %>%
+        rename(predicted = y) %>%
+        mutate(site_id = sites[s]) %>%
+        mutate(forecast_iteration_id = start_forecast) %>%
+        mutate(forecast_project_id = team_name,
+               variable =  target_variables[i])
     }
-    
-    #Filter only the forecasted dates and add columns for required variable
-    forecast_saved_tmp <- model_output %>%
-      filter(time >= start_forecast) %>%
-      rename(predicted = y) %>%
-      mutate(site_id = sites[s]) %>%
-      mutate(forecast_iteration_id = start_forecast) %>%
-      mutate(forecast_project_id = team_name,
-             variable =  target_variables[i])
-    
     
     # Combined with the previous sites
     forecast_saved <- rbind(forecast_saved, forecast_saved_tmp)
@@ -200,17 +166,16 @@ for(i in 1:length(target_variables)){
   }
 }
 
-forecast_saved <- forecast_saved |> 
-  select(time, site_id, variable, ensemble, predicted)
-
 forecast_file_name <- paste0("aquatics-",lubridate::as_date(min(forecast_saved$time)),"-",team_name,".csv.gz")
 
+
+forecast_saved <- forecast_saved |> 
+  select(time, site_id, variable, ensemble, predicted)
 
 write_csv(forecast_saved, forecast_file_name)
 
 neon4cast::submit(forecast_file = forecast_file_name, 
                   metadata = NULL, 
                   ask = FALSE)
-
 
 unlink(forecast_file_name)

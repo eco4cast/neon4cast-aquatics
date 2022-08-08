@@ -45,9 +45,8 @@ targets <- read_csv("https://data.ecoforecast.org/neon4cast-targets/aquatics/aqu
 
 sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20210928.csv")
 
-site_names <- c(sites$field_site_id, c("SUGG", "PRLA", "PRPO", "LIRO"))
+site_names <- sites$field_site_id
 
-site_names <- c(sites$field_site_id, c("SUGG", "PRLA", "PRPO", "LIRO"))
 
 # calculates a doy average for each target variable in each site
 target_clim <- targets %>%  
@@ -79,7 +78,7 @@ forecast <- target_clim %>%
                        as_date((doy-1), origin = paste(year(Sys.Date())+1, "01", "01", sep = "-")),
                        as_date((doy-1), origin = paste(year(Sys.Date()), "01", "01", sep = "-")))))
 
-subseted_site_names <- unique(forecast$siteID)
+subseted_site_names <- unique(forecast$site_id)
 site_vector <- NULL
 for(i in 1:length(subseted_site_names)){
   site_vector <- c(site_vector, rep(subseted_site_names[i], length(forecast_dates)))
@@ -97,25 +96,40 @@ forecast_tibble3 <- tibble(time = rep(forecast_dates, length(subseted_site_names
                           site_id = site_vector,
                           variable = "chla")
 
+forecast_tibble <- bind_rows(forecast_tibble1, forecast_tibble2, forecast_tibble3)
+
+foreast <- right_join(forecast, forecast_tibble)
+
+forecast |> 
+  ggplot(aes(x = time, y = mean)) +
+  geom_point() +
+  facet_grid(site_id ~ variable, scale = "free")
+
 combined <- forecast %>% 
   select(time, site_id, variable, mean, sd) %>% 
   group_by(site_id, variable) %>% 
-  mutate(mean = imputeTS::na_interpolation(mean, maxgap = 3),
+  mutate(mean = imputeTS::na_interpolation(mean),
          sd = median(sd, na.rm = TRUE)) %>%
   pivot_longer(c("mean", "sd"),names_to = "parameter", values_to = "predicted") |> 
   mutate(family = "norm") |> 
   select(time, site_id, variable, family, parameter, predicted)
+
+combined |> 
+  filter(parameter == "mean") |> 
+  ggplot(aes(x = time, y = predicted)) +
+  geom_point() +
+  facet_grid(site_id ~ variable, scale = "free")
   
   
 # plot the forecasts
 combined %>% 
-  select(time, chla ,statistic, siteID) %>% 
-  pivot_wider(names_from = statistic, values_from = chla) %>% 
+  select(time, predicted ,parameter, variable, site_id) %>% 
+  pivot_wider(names_from = parameter, values_from = predicted) %>% 
   ggplot(aes(x = time)) +
   geom_ribbon(aes(ymin=mean - sd*1.96, ymax=mean + sd*1.96), alpha = 0.1) + 
-  geom_point(aes(y = mean)) +
-  labs(y = "chla") +
-  facet_grid(variable~site_id, scales = "free")
+  geom_line(aes(y = mean)) +
+  facet_grid(variable~site_id, scales = "free") +
+  theme_bw()
 ggsave("clim.png", width = 10, height = 10)
 
 forecast_file <- paste("aquatics", min(combined$time), "climatology.csv.gz", sep = "-")

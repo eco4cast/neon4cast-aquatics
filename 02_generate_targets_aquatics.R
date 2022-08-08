@@ -91,15 +91,15 @@ wq_portal <- wq_portal %>% # sensor depth of NA == surface?
   dplyr::mutate(dissolvedOxygen = ifelse(dissolvedOxygenFinalQF == 0, dissolvedOxygen, NA),
                 chla = ifelse(chlorophyllFinalQF == 0, chla, NA)) %>% 
   dplyr::group_by(site_id, time) %>%
-  dplyr::summarize(oxygen__observation = mean(dissolvedOxygen, na.rm = TRUE),
-                   chla__observation = mean(chla, na.rm = TRUE),
+  dplyr::summarize(oxygen__observed = mean(dissolvedOxygen, na.rm = TRUE),
+                   chla__observed = mean(chla, na.rm = TRUE),
                    oxygen__sample_error = se(dissolvedOxygen),
                    chla__sample_error = se(chla),
                    count = sum(!is.na(dissolvedOxygen)),
                    chla__measure_error = mean(chlorophyllExpUncert, na.rm = TRUE)/sqrt(count),
                    oxygen__measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
   dplyr::select(time, site_id, 
-                oxygen__observation, chla__observation, 
+                oxygen__observed, chla__observed, 
                 oxygen__sample_error, chla__sample_error, 
                 oxygen__measure_error, chla__measure_error) %>% 
   pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "__") %>%
@@ -184,38 +184,38 @@ chla_min <- 0
 # outside the ranges specified about
 
 wq_cleaned <- wq_full %>%
-  dplyr::mutate(observation = ifelse(is.na(observation),
-                                     observation, ifelse(observation >= DO_min & observation <= DO_max & variable == 'oxygen', 
-                                                         observation, ifelse(observation >= chla_min & observation <= chla_max & variable == 'chla', observation, NA)))) %>%
+  dplyr::mutate(observed = ifelse(is.na(observed),
+                                     observed, ifelse(observed >= DO_min & observed <= DO_max & variable == 'oxygen', 
+                                                         observed, ifelse(observed >= chla_min & observed <= chla_max & variable == 'chla', observed, NA)))) %>%
   # manual cleaning based on visual inspection
-  dplyr::mutate(observation = ifelse(site_id == "MAYF" & 
+  dplyr::mutate(observed = ifelse(site_id == "MAYF" & 
                                        between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
-                                       variable == "oxygen", NA, observation),
-                observation = ifelse(site_id == "WLOU" &
-                                       !between(observation, 7.5, 11) & 
-                                       variable == "oxygen", NA, observation),
-                observation = ifelse(site_id == "BARC" & 
-                                       observation < 4 &
-                                       variable == "oxygen", NA, observation),
+                                       variable == "oxygen", NA, observed),
+                observed = ifelse(site_id == "WLOU" &
+                                       !between(observed, 7.5, 11) & 
+                                       variable == "oxygen", NA, observed),
+                observed = ifelse(site_id == "BARC" & 
+                                       observed < 4 &
+                                       variable == "oxygen", NA, observed),
                 
                 measure_error = ifelse(site_id == "MAYF" &
                                  between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
                                  variable == "oxygen", NA, measure_error),
                 measure_error = ifelse(site_id == "WLOU" &
-                                 !between(observation, 7.5, 11) & 
+                                 !between(observed, 7.5, 11) & 
                                  variable == "oxygen", NA, measure_error),
                 measure_error = ifelse(site_id == "BARC" & 
-                                 observation < 4 &
+                                 observed < 4 &
                                  variable == "oxygen", NA, measure_error),
                 
                 sample_error = ifelse(site_id == "MAYF" & 
                               between(time, ymd("2019-01-20"), ymd("2019-02-05")) &
                               variable == "oxygen", NA, sample_error),
                 sample_error = ifelse(site_id == "WLOU" &
-                              !between(observation, 7.5, 11) & 
+                              !between(observed, 7.5, 11) & 
                               variable == "oxygen", NA, sample_error),
                 sample_error = ifelse(site_id == "BARC" & 
-                              observation < 4 &
+                              observed < 4 &
                               variable == "oxygen", NA, sample_error))
 
 #===============================================#
@@ -312,19 +312,19 @@ hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP
   dplyr::mutate(time = ymd_h(format(startDateTime, "%y-%m-%d %H")),
                 depth = round(depth, 1)) %>% # round to the nearest 0.1 m
   group_by(site_id, depth, time) %>%
-  dplyr::summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
+  dplyr::summarize(temperature__observed = mean(tsdWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(tsdWaterTempMean)),
                    temperature__sample_error = se(tsdWaterTempMean),
                    temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
-  dplyr::select(time, site_id, temperature__observation, depth,
+  dplyr::select(time, site_id, temperature__observed, depth,
                 temperature__sample_error, temperature__measure_error) %>%
   pivot_longer(names_to = c('variable','stat'),
                names_sep = '__',
-               cols = c(temperature__observation,temperature__sample_error, temperature__measure_error)) %>%
+               cols = c(temperature__observed,temperature__sample_error, temperature__measure_error)) %>%
   pivot_wider(names_from = stat, values_from = value) %>%
   # include first QC of data
   QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T) %>%
-  mutate(measure_error = ifelse(is.na(observation), NA, measure_error),
+  mutate(measure_error = ifelse(is.na(observed), NA, measure_error),
          data_source = 'NEON_portal')
 
 message("##### Sonde EDI data #####")
@@ -371,16 +371,16 @@ edi_lake_files <- c(edi_data[grepl(x = edi_data, pattern= lake_sites[1])],
 hourly_temp_profile_EDI <- purrr::map_dfr(.x = edi_lake_files, ~ read.csv(file = .x)) %>%
   rename('site_id' = siteID,
          'depth' = sensorDepth,
-         'observation' = waterTemp) %>%
+         'observed' = waterTemp) %>%
   mutate(startDate  = lubridate::ymd_hm(startDate),
          time = lubridate::ymd_h(format(startDate, '%Y-%m-%d %H')),
          depth = round(depth, digits = 1)) %>%
   group_by(site_id, time, depth) %>%
-  summarise(temperature__observation = mean(observation),
-            temperature__sample_error = se(observation)) %>%
+  summarise(temperature__observed = mean(observed),
+            temperature__sample_error = se(observed)) %>%
   pivot_longer(names_to = c('variable','stat'),
                names_sep = '__',
-               cols = temperature__observation:temperature__sample_error) %>%
+               cols = temperature__observed:temperature__sample_error) %>%
   pivot_wider(names_from = stat, values_from = value) %>%
   mutate(measure_error = NA) %>%
   # include first QC of data
@@ -428,27 +428,27 @@ hourly_temp_profile_avro <- purrr::map_dfr(.x = lake_avro_files,
                                                                    thermistor_depths = thermistor_depths)) %>% 
   # include first QC of data
   QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T)  %>%
-  mutate(measure_error = ifelse(is.na(observation), NA, measure_error), 
+  mutate(measure_error = ifelse(is.na(observed), NA, measure_error), 
          data_source = 'NEON_pre-portal')
 
 # Combine the three data sources
 hourly_temp_profile_lakes <- rbind(hourly_temp_profile_portal, hourly_temp_profile_EDI, hourly_temp_profile_avro) %>%
   arrange(time, site_id, depth) %>%
   group_by(time, site_id, depth) %>%
-  summarise(observed = mean(observation, na.rm = T),
+  summarise(observed = mean(observed, na.rm = T),
             sample_error = mean(sample_error, na.rm = T),
             measure_error = mean(measure_error, na.rm = T))
 
 #======================================================#
 
 message("#### Generate surface (< 1 m) temperature #############")
-###### Lake temperatures #####
+message("###### Lake temperatures #####")
 # Daily surface lake temperatures generated from the hourly profiles created above
 daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
   filter(depth <= 1) %>%
   mutate(time = lubridate::as_date(time)) %>%
   group_by(site_id, time) %>%
-  summarise(observation = mean(observation, na.rm = T),
+  summarise(observed = mean(observed, na.rm = T),
             sample_error = mean(sample_error, na.rm = T),
             measure_error = mean(measure_error, na.rm = T)) %>%
   mutate(variable = 'temperature')     
@@ -456,31 +456,33 @@ daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
 message("##### Stream temperatures #####")
 temp_streams_portal <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
   # neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
-  dplyr::rename(site_id = siteID) %>%
+  dplyr::filter(horizontalPosition == "101", # take upstream to match WQ data
+                finalQF == 0) %>%  
+  dplyr::select(startDateTime, siteID, surfWaterTempMean, surfWaterTempExpUncert, finalQF) %>%
   # horizontal position is upstream or downstream is 101 or 102 horizontal position
-  dplyr::filter(horizontalPosition == "101") %>%  # take upstream to match WQ data
-  dplyr::select(startDateTime, site_id, surfWaterTempMean, surfWaterTempExpUncert, finalQF) %>%
-  dplyr::filter(finalQF == 0) %>%
-  dplyr::collect()
+  dplyr::collect() %>%
+  dplyr::rename(site_id = siteID) 
 
+message("##### Stream temperatures2 #####")
 temp_streams_portal <- temp_streams_portal %>%
   dplyr::mutate(time = as_date(startDateTime)) %>% 
   dplyr::group_by(time, site_id) %>%
-  dplyr::summarize(temperature__observation = mean(surfWaterTempMean, na.rm = TRUE),
+  dplyr::summarize(temperature__observed = mean(surfWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(surfWaterTempMean)),
                    temperature__sample_error = se(surfWaterTempMean),
                    temperature__measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
   #dplyr::filter(count > 44) %>% 
-  dplyr::select(time, site_id, temperature__observation, 
+  dplyr::select(time, site_id, temperature__observed, 
                 temperature__sample_error, temperature__measure_error) %>%
   pivot_longer(cols = !c(time, site_id), 
                names_to = c("variable", "stat"),
                names_sep = '__') %>%
   pivot_wider(names_from = stat, values_from = value) 
 
+message("##### Stream temperatures3 #####")
 temp_streams_portal_QC <- temp_streams_portal %>%
   QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F)  %>%
-  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
+  mutate(measure_error = ifelse(is.na(observed), NA, measure_error))
 #===========================================#
   
     #### avros
@@ -521,7 +523,7 @@ prt_avro_files <- paste0(avro_file_directory, '/',
 # Read in each of the files and then bind by rows
 temp_streams_avros <- purrr::map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc, path = .x)) %>%
   QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F) %>%
-  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
+  mutate(measure_error = ifelse(is.na(observed), NA, measure_error))
   
 #===============================================#
 
@@ -541,11 +543,11 @@ temp_rivers_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP1.20264.
 temp_rivers_portal <- temp_rivers_portal %>%
   dplyr::mutate(time = as_date(startDateTime)) %>% 
   dplyr::group_by(time, site_id) %>%
-  dplyr::summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
+  dplyr::summarize(temperature__observed = mean(tsdWaterTempMean, na.rm = TRUE),
                    count = sum(!is.na(tsdWaterTempMean)),
                    temperature__sample_error = se(tsdWaterTempMean),
                    temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) /sqrt(count),.groups = "drop") %>%
-  dplyr::select(time, site_id, temperature__observation, 
+  dplyr::select(time, site_id, temperature__observed, 
                 temperature__sample_error, temperature__measure_error) %>%
   pivot_longer(cols = !c(time, site_id), 
                names_to = c("variable", "stat"),
@@ -554,7 +556,7 @@ temp_rivers_portal <- temp_rivers_portal %>%
 
 temp_rivers_portal_QC <- temp_rivers_portal %>%
   QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F)  %>%
-  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
+  mutate(measure_error = ifelse(is.na(observed), NA, measure_error))
 
    # EDI data
 edi_url_river <- c("https://pasta.lternet.edu/package/data/eml/edi/1185/1/fb9cf9ba62ee8e8cf94cb020175e9165",
@@ -585,15 +587,15 @@ edi_rivers <- c(edi_data[grepl(x = edi_data, pattern= nonwadable_rivers[1])],
 # The hourly data set is for the whole water column.
 temp_rivers_EDI <- purrr::map_dfr(.x = edi_rivers, ~ read.csv(file = .x)) %>%
   rename('site_id' = siteID,
-         'observation' = waterTemp) %>%
+         'observed' = waterTemp) %>%
   mutate(startDate  = lubridate::ymd_hm(startDate),
          time = as.Date(startDate)) %>% 
   group_by(site_id, time) %>%
-  summarise(temperature__observation = mean(observation),
-            temperature__sample_error = se(observation)) %>%
+  summarise(temperature__observed = mean(observed),
+            temperature__sample_error = se(observed)) %>%
   pivot_longer(names_to = c('variable','stat'),
                names_sep = '__',
-               cols = c(temperature__observation,temperature__sample_error)) %>%
+               cols = c(temperature__observed,temperature__sample_error)) %>%
   pivot_wider(names_from = stat, values_from = value) %>%
   mutate(measure_error = NA) %>%
   # include first QC of data
@@ -618,7 +620,7 @@ temp_rivers_avros <- purrr::map_dfr(.x = river_avro_files,
                                                            thermistor_depths = thermistor_depths)) %>% 
   # include first QC of data
   QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = F)  %>%
-  mutate(measure_error = ifelse(is.na(observation), NA, measure_error))
+  mutate(measure_error = ifelse(is.na(observed), NA, measure_error))
 #===========================================#
 
 message("#### surface temperatures ####")
@@ -637,7 +639,7 @@ temp_full <- dplyr::bind_rows(# Lakes surface temperature
                               temp_rivers_avros) %>%
   dplyr::arrange(site_id, time) %>%
   group_by(site_id, time) %>%
-  summarise(observation = mean(observation, na.rm = T),
+  summarise(observed = mean(observed, na.rm = T),
             sample_error = mean(sample_error, na.rm = T),
             measure_error = mean(measure_error, na.rm = T)) %>%
   mutate(variable = 'temperature')
@@ -654,15 +656,15 @@ T_min <- -2 # gross min
 # GR flag will be true if the temperature is outside the range specified 
 temp_cleaned <-
   temp_full %>%
-  dplyr::mutate(observation =ifelse(observation >= T_min & observation <= T_max , 
-                                    observation, NA),
-                sample_error = ifelse(observation >= T_min & observation <= T_max , 
+  dplyr::mutate(observed =ifelse(observed >= T_min & observed <= T_max , 
+                                    observed, NA),
+                sample_error = ifelse(observed >= T_min & observed <= T_max , 
                             sample_error, NA),
-                measure_error = ifelse(observation >= T_min & observation <= T_max , 
+                measure_error = ifelse(observed >= T_min & observed <= T_max , 
                                measure_error, NA))  %>%
-  # manual cleaning based on observationervations
-  dplyr:: mutate(observation = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
-                                      NA, observation),
+  # manual cleaning based on observed
+  dplyr:: mutate(observed = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
+                                      NA, observed),
                  sample_error = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
                              NA, sample_error),
                  measure_error = ifelse(site_id == "PRLA" & time <ymd("2019-01-01"),
@@ -672,7 +674,7 @@ temp_cleaned <-
 #### Targets==========================
 targets_long <- dplyr::bind_rows(wq_cleaned, temp_cleaned) %>%
   dplyr::arrange(site_id, time, variable) %>%
-  dplyr::mutate(observed = ifelse(is.nan(observation), NA, observation),
+  dplyr::mutate(observed = ifelse(is.nan(observed), NA, observed),
                 sample_error = ifelse(is.nan(sample_error), NA, sample_error),
                 measure_error = ifelse(is.nan(measure_error), NA, measure_error))
 

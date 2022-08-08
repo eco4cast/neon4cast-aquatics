@@ -85,8 +85,8 @@ read.avro.wq <- function(sc, name = 'name', path) {
                chlorophyll = ifelse('chlorophyll' %in% colnames(wq_tibble_wider), chlorophyll, NA),
                chlorophyllExpUncert = ifelse('chlorophyll' %in% colnames(wq_tibble_wider),chlorophyllExpUncert,NA)) %>%
         group_by(siteName, time) %>%
-        summarize(oxygen__observation = mean(dissolvedOxygen, na.rm = TRUE),
-                  chla__observation = mean(chlorophyll, na.rm = TRUE),
+        summarize(oxygen__observed = mean(dissolvedOxygen, na.rm = TRUE),
+                  chla__observed = mean(chlorophyll, na.rm = TRUE),
                   oxygen__sample_error = se(dissolvedOxygen),
                   chla__sample_error = se(chlorophyll),
                   count = sum(!is.na(dissolvedOxygen)),
@@ -116,13 +116,13 @@ read.avro.wq <- function(sc, name = 'name', path) {
       empty <- data.frame(site_id = NA, 
                           time = NA, 
                           variable = NA,
-                          observation = NA, 
+                          observed = NA, 
                           sample_error = NA,
                           measure_error = NA)  %>%
         mutate(site_id = as.character(site_id),
                time = as.Date(time),
                variable = as.character(variable),
-               observation = as.numeric(observation),
+               observed = as.numeric(observed),
                sample_error = as.numeric(sample_error),
                measure_error = as.numeric(measure_error)) %>%
         filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
@@ -170,7 +170,7 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
         # tsdWaterTempExpUncert = ifelse('tsdWaterTempExpUncert' %in% colnames(tsd_tibble_wider),
         #                                tsdWaterTempExpUncert, NA)) %>%
         group_by(siteName, time) %>%
-        summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
+        summarize(temperature__observed = mean(tsdWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(tsdWaterTempMean)),
                   temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
                   temperature__sample_error = se(tsdWaterTempMean),
@@ -193,13 +193,13 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
     empty <- data.frame(site_id = NA,
                         time = NA, 
                         variable = NA, 
-                        observation = NA, 
+                        observed = NA, 
                         sample_error = NA,
                         measure_error = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
-             observation = as.numeric(observation),
+             observed = as.numeric(observed),
              sample_error = as.numeric(sample_error),
              measure_error = as.numeric(measure_error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
@@ -246,7 +246,7 @@ read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
         # tsdWaterTempExpUncert = ifelse('tsdWaterTempExpUncert' %in% colnames(tsd_tibble_wider),
         #                                tsdWaterTempExpUncert, NA)) %>%
         group_by(siteName, time, thermistorDepth) %>%
-        summarize(temperature__observation = mean(tsdWaterTempMean, na.rm = TRUE),
+        summarize(temperature__observed = mean(tsdWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(tsdWaterTempMean)),
                   temperature__measure_error = mean(tsdWaterTempExpUncert) / sqrt(count),
                   temperature__sample_error = se(tsdWaterTempMean),
@@ -271,14 +271,14 @@ read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
                         time = NA, 
                         depth = NA,
                         variable = NA, 
-                        observation = NA, 
+                        observed = NA, 
                         sample_error = NA,
                         measure_error = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              depth = as.numeric(depth),
              variable = as.character(variable),
-             observation = as.numeric(observation),
+             observed = as.numeric(observed),
              sample_error = as.numeric(sample_error),
              measure_error = as.numeric(measure_error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
@@ -319,7 +319,7 @@ read.avro.prt <- function(sc, name = 'name', path) {
       daily_prt <- prt_tibble_wider  %>%
         mutate(time = as.Date(startDate)) %>%
         group_by(siteName, time) %>%
-        summarize(temperature__observation = mean(surfWaterTempMean, na.rm = TRUE),
+        summarize(temperature__observed = mean(surfWaterTempMean, na.rm = TRUE),
                   count = sum(!is.na(surfWaterTempMean)),
                   temperature__measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
                   temperature__sample_error = se(surfWaterTempMean),
@@ -342,13 +342,13 @@ read.avro.prt <- function(sc, name = 'name', path) {
     empty <- data.frame(site_id = NA, 
                         time = NA, 
                         variable = NA, 
-                        observation = NA, 
+                        observed = NA, 
                         sample_error = NA,
                         measure_error = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
-             observation = as.numeric(observation),
+             observed = as.numeric(observed),
              sample_error = as.numeric(sample_error),
              measure_error = as.numeric(measure_error)) %>%
       filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
