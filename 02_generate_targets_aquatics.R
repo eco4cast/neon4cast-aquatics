@@ -60,13 +60,20 @@ stream_sites <- sites$field_site_id[(which(sites$field_site_subtype == "Wadeable
 # message("neon_table(table = 'TSW_30min')")
 # temp_prt <- neonstore::neon_table("TSW_30min", site = stream_sites) 
 
+sc <- sparklyr::spark_connect(master = "local")
 
-message("#### Generate WQ table #############")
 neon <- arrow::s3_bucket("neon4cast-targets/neon",
                          endpoint_override = "data.ecoforecast.org",
                          anonymous = TRUE)
+
+
+
+
+message("#### Generate WQ table #############")
+
 # list tables with `neon$ls()`
 wq_portal <- arrow::open_dataset(neon$path("waq_instantaneous-basic-DP1.20288.001")) %>%   # waq_instantaneous
+#wq_portal <- neonstore::neon_table("waq_instantaneous-basic", site = sites$field_site_id) %>%   # waq_instantaneous
   dplyr::filter(siteID %in% sites$field_site_id) %>%
   dplyr::select(siteID, startDateTime, sensorDepth,
                 dissolvedOxygen,dissolvedOxygenExpUncert,dissolvedOxygenFinalQF, 
@@ -77,8 +84,8 @@ wq_portal <- arrow::open_dataset(neon$path("waq_instantaneous-basic-DP1.20288.00
                 chla = as.numeric(chlorophyll),
                 chlorophyllExpUncert = as.numeric(chlorophyllExpUncert)) %>%
   rename(site_id = siteID) %>% 
-  dplyr::filter(((sensorDepth > 0 & sensorDepth < 1)| is.na(sensorDepth))) %>%
-  dplyr::collect()
+  dplyr::filter(((sensorDepth > 0 & sensorDepth < 1)| is.na(sensorDepth))) |> 
+  collect()
 
 print("here")
 
@@ -103,7 +110,7 @@ wq_portal <- wq_portal %>% # sensor depth of NA == surface?
                 oxygen__measure_error, chla__measure_error) %>% 
   pivot_longer(cols = !c(time, site_id), names_to = c("variable", "stat"), names_sep = "__") %>%
   pivot_wider(names_from = stat, values_from = value) %>%
-  filter(!(variable == "chla" & site_id %in% stream_sites))
+  dplyr::filter(!(variable == "chla" & site_id %in% stream_sites))
   
 #====================================================#
 ##### low latency WQ data =======
@@ -118,7 +125,6 @@ fs::dir_create(avro_file_directory) # ignores existing directories unlike dir.cr
 cur_wq_month <- format(as.Date(max(wq_portal$time)), "%Y-%m")
 # what is the next month from this plus the current month? These might be the same
 new_month_wq <- unique(format(c((as.Date(max(wq_portal$time)) %m+% months(1)), (Sys.Date() - days(2))), "%Y-%m"))
-
 
 # Start by deleting superseded files
 # Files that have been supersed by the NEON store files can be deleted from the relevent repository
@@ -138,7 +144,9 @@ download.neon.avro(months = new_month_wq,
 
 # Read in the new files to append to the NEONstore data
 # connect to spark locally 
-sc <- sparklyr::spark_connect(master = "local", version = '3.0')
+#sc <- sparklyr::spark_connect(master = "local", version = '3.0')
+
+
 
 # The variables (term names that should be kept)
 wq_vars <- c('siteName',
@@ -220,13 +228,13 @@ wq_cleaned <- wq_full %>%
 #===============================================#
 message("#### Generate hourly temperature profiles for lake #############")
 message("##### NEON portal data #####")
-hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP1.20264.001")) %>%
-  # neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
+#hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP1.20264.001")) %>%
+  hourly_temp_profile_portal <- neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
   rename(site_id = siteID,
          depth = thermistorDepth) %>%
   dplyr::filter(site_id %in% lake_sites) %>%
   dplyr::select(startDateTime, site_id, tsdWaterTempMean, depth, tsdWaterTempExpUncert, tsdWaterTempFinalQF, verticalPosition) %>%
-  dplyr::collect() %>%
+  #dplyr::collect() %>%
   # errors in the sensor depths reported - see "https://www.neonscience.org/impact/observatory-blog/incorrect-depths-associated-lake-and-river-temperature-profiles"
   # sensor depths are manually assigned based on "vertical position" variable as per table on webpage
   dplyr::mutate(depth = ifelse(site_id == "CRAM" & 
@@ -316,7 +324,10 @@ hourly_temp_profile_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP
                    temperature__sample_error = se(tsdWaterTempMean),
                    temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE)/sqrt(count),.groups = "drop") %>%
   dplyr::select(time, site_id, temperature__observed, depth,
-                temperature__sample_error, temperature__measure_error) %>%
+                temperature__sample_error, temperature__measure_error)
+
+
+  hourly_temp_profile_portal <- hourly_temp_profile_portal |> 
   pivot_longer(names_to = c('variable','stat'),
                names_sep = '__',
                cols = c(temperature__observed,temperature__sample_error, temperature__measure_error)) %>%
@@ -431,13 +442,8 @@ hourly_temp_profile_avro <- purrr::map_dfr(.x = lake_avro_files,
   mutate(measure_error = ifelse(is.na(observed), NA, measure_error), 
          data_source = 'NEON_pre-portal')
 
-
-
-
-
-
 # Combine the three data sources
-hourly_temp_profile_lakes <- rbind(hourly_temp_profile_portal, hourly_temp_profile_EDI, hourly_temp_profile_avro) %>%
+hourly_temp_profile_lakes <- bind_rows(hourly_temp_profile_portal, hourly_temp_profile_EDI, hourly_temp_profile_avro) %>%
   arrange(time, site_id, depth) %>%
   group_by(time, site_id, depth) %>%
   summarise(observed = mean(observed, na.rm = T),
@@ -450,7 +456,7 @@ message("#### Generate surface (< 1 m) temperature #############")
 message("###### Lake temperatures #####")
 # Daily surface lake temperatures generated from the hourly profiles created above
 daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
-  filter(depth <= 1) %>%
+  dplyr::filter(depth <= 1) %>%
   mutate(time = lubridate::as_date(time)) %>%
   group_by(site_id, time) %>%
   summarise(observed = mean(observed, na.rm = T),
@@ -459,13 +465,13 @@ daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
   mutate(variable = 'temperature')     
  
 message("##### Stream temperatures #####")
-temp_streams_portal <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
-  # neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
+#temp_streams_portal <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
+  temp_streams_portal <- neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
   dplyr::filter(horizontalPosition == "101", # take upstream to match WQ data
                 finalQF == 0) %>%  
   dplyr::select(startDateTime, siteID, surfWaterTempMean, surfWaterTempExpUncert, finalQF) %>%
   # horizontal position is upstream or downstream is 101 or 102 horizontal position
-  dplyr::collect() %>%
+  #dplyr::collect() %>%
   dplyr::rename(site_id = siteID) 
 
 message("##### Stream temperatures2 #####")
@@ -510,7 +516,7 @@ download.neon.avro(months = new_month_wq,
 
 # Read in the new files to append to the NEONstore data
 # connect to spark locally 
-sc <- sparklyr::spark_connect(master = "local")
+
 
 # The variables (term names that should be kept)
 prt_vars <- c('siteName',
@@ -538,14 +544,14 @@ message("##### River temperature ######")
 # For non-wadeable rivers need portal, EDI and avro data
   
   # Portal data
-temp_rivers_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP1.20264.001")) %>%
-  # neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
+#temp_rivers_portal <- arrow::open_dataset(neon$path("TSD_30_min-basic-DP1.20264.001")) %>%
+  temp_rivers_portal <- neonstore::neon_table("TSD_30_min", site = sites$field_site_id) %>%
   rename(site_id = siteID,
          depth = thermistorDepth) %>%
-  filter(site_id %in% nonwadable_rivers) %>%
+  dplyr::filter(site_id %in% nonwadable_rivers) %>%
   dplyr::select(startDateTime, site_id, tsdWaterTempMean, depth, tsdWaterTempExpUncert, tsdWaterTempFinalQF) %>%
-  filter(tsdWaterTempFinalQF == 0) %>%
-  dplyr::collect()
+  dplyr::filter(tsdWaterTempFinalQF == 0) #%>%
+  #dplyr::collect()
 
 temp_rivers_portal <- temp_rivers_portal %>%
   dplyr::mutate(time = as_date(startDateTime)) %>% 

@@ -56,25 +56,13 @@ read.avro.wq <- function(sc, name = 'name', path) {
   message(paste0('reading file ', path))
   wq_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
                                         path = path) |> 
-    collect()
-
-  wq_vars <- c('siteName',
-               'startDate',
-               'dissolvedOxygen',
-               'dissolvedOxygenExpUncert',
-               'dissolvedOxygenFinalQF',
-               'chlorophyll',
-               'chlorophyllExpUncert',
-               'chlorophyllFinalQF')
-  columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
-  
-  wq_avro <- wq_avro |> 
     dplyr::filter(termName %in% wq_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
   dplyr::filter(horizontalIndex %in% c('101', '103')) %>%
   dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue) %>%
+    dplyr::collect() |> 
     # combine the value fields to one
     dplyr::mutate(Value = ifelse(is.na(doubleValue), 
                           intValue, doubleValue)) %>%
@@ -145,19 +133,15 @@ read.avro.wq <- function(sc, name = 'name', path) {
 read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
   message(paste0('reading file ', path))
   tsd_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
-                                         path = path,
-                                         memory = FALSE,
-                                         overwrite = TRUE) |> 
-    collect()
-  
-  tsd_avro <- tsd_avro |> 
+                                         path = path) |> 
     dplyr::filter(termName %in% tsd_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
     dplyr::filter(horizontalIndex %in% c('101', '103'), 
-           temporalIndex == 030) %>% # take the 30-minutely data only
+           temporalIndex == "030") %>% # take the 30-minutely data only
     dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue, verticalIndex) %>%
+    collect() |> 
     # combine the value fields to one
     dplyr::mutate(Value = ifelse(is.na(doubleValue), 
                           intValue, doubleValue)) %>%
@@ -227,20 +211,17 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
 
 read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
   message(paste0('reading file ', path))
-  tsd_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
-                                         path = path,
-                                         memory = FALSE,
-                                         overwrite = TRUE) %>%
-    collect()
-  
-  tsd_avro <- tsd_avro |> 
+
+    tsd_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
+                                           path = path) %>%
     dplyr::filter(termName %in% tsd_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
     dplyr::filter(horizontalIndex %in% c('101', '103'), 
-           temporalIndex == 030) %>% # take the 30-minutely data only
+           temporalIndex == "030") %>% # take the 30-minutely data only
     dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue, verticalIndex) %>%
+    collect() |> 
     # combine the value fields to one
     dplyr::mutate(Value = ifelse(is.na(doubleValue), 
                           intValue, doubleValue)) %>%
@@ -312,19 +293,15 @@ read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
 read.avro.prt <- function(sc, name = 'name', path) {
   message(paste0('reading file ', path))
   prt_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
-                                         path = path,
-                                         memory = FALSE,
-                                         overwrite = TRUE) %>%
-    collect()
-  
-  prt_avro <- prt_avro
+                                         path = path) |> 
     dplyr::filter(termName %in% prt_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
       dplyr::filter(horizontalIndex %in% c('101', '103'), 
-           temporalIndex == 030) %>% # take the 30-minutely data only
+           temporalIndex == "030") %>% # take the 30-minutely data only
       dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue) %>%
+    collect() |> 
     # combine the value fields to one
       dplyr::mutate(Value = ifelse(is.na(doubleValue), 
                           intValue, doubleValue)) %>%
