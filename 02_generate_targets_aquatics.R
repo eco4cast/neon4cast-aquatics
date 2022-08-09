@@ -85,7 +85,6 @@ print("here")
 wq_portal <- wq_portal %>% # sensor depth of NA == surface?
   dplyr::mutate(startDateTime = as_datetime(startDateTime)) %>%
   dplyr::mutate(time = as_date(startDateTime)) %>%
-  
   # QF (quality flag) == 0, is a pass (1 == fail), 
   # make NA so these values are not used in the mean summary
   dplyr::mutate(dissolvedOxygen = ifelse(dissolvedOxygenFinalQF == 0, dissolvedOxygen, NA),
@@ -139,7 +138,7 @@ download.neon.avro(months = new_month_wq,
 
 # Read in the new files to append to the NEONstore data
 # connect to spark locally 
-sc <- sparklyr::spark_connect(master = "local", version = '3.0', )
+sc <- sparklyr::spark_connect(master = "local", version = '3.0')
 
 # The variables (term names that should be kept)
 wq_vars <- c('siteName',
@@ -394,7 +393,7 @@ download.neon.avro(months = new_month_wq,
                    data_product = '20264',  # TSD data product
                    path = avro_file_directory)
 
-sc <- sparklyr::spark_connect(master = "local")
+
 
 # The variables (term names that should be kept)
 tsd_vars <- c('siteName',
@@ -421,6 +420,7 @@ lake_avro_files <- c(tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_site
                      tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[6])],
                      tsd_avro_files[grepl(x = tsd_avro_files, pattern= lake_sites[7])])
 
+#sc <- sparklyr::spark_connect(master = "local")
 message("# Read in each of the files and then bind by rows")
 hourly_temp_profile_avro <- purrr::map_dfr(.x = lake_avro_files,
                                            ~ read.avro.tsd.profile(sc= sc,
@@ -430,6 +430,11 @@ hourly_temp_profile_avro <- purrr::map_dfr(.x = lake_avro_files,
   QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = T)  %>%
   mutate(measure_error = ifelse(is.na(observed), NA, measure_error), 
          data_source = 'NEON_pre-portal')
+
+
+
+
+
 
 # Combine the three data sources
 hourly_temp_profile_lakes <- rbind(hourly_temp_profile_portal, hourly_temp_profile_EDI, hourly_temp_profile_avro) %>%
@@ -524,6 +529,8 @@ prt_avro_files <- paste0(avro_file_directory, '/',
 temp_streams_avros <- purrr::map_dfr(.x = prt_avro_files, ~ read.avro.prt(sc= sc, path = .x)) %>%
   QC.temp(df = ., range = c(-5, 40), spike = 7, by.depth = F) %>%
   mutate(measure_error = ifelse(is.na(observed), NA, measure_error))
+
+
   
 #===============================================#
 
@@ -621,6 +628,9 @@ temp_rivers_avros <- purrr::map_dfr(.x = river_avro_files,
   # include first QC of data
   QC.temp(df = ., range = c(-5, 40), spike = 5, by.depth = F)  %>%
   mutate(measure_error = ifelse(is.na(observed), NA, measure_error))
+
+
+spark_disconnect(sc)
 #===========================================#
 
 message("#### surface temperatures ####")

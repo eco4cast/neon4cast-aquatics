@@ -5,7 +5,7 @@ download.neon.avro <- function(months, sites, data_product, path) {
     if (paste0('site=', sites[i]) %in% list.dirs(path, full.names = F)) {
       # message('directory exists')
     } else {
-      dir.create(path = paste0(path, '/site=', sites[i]), recursive = TRUE)
+      dir.create(path = paste0(path, '/site=', sites[i]), recursive = TRUE, showWarnings = FALSE)
       message('creating new directory')
     }
     
@@ -55,18 +55,31 @@ delete.neon.avro <- function(months, sites, path) {
 read.avro.wq <- function(sc, name = 'name', path) {
   message(paste0('reading file ', path))
   wq_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
-                                        path = path) %>%
-    filter(termName %in% wq_vars) %>%
+                                        path = path) |> 
+    collect()
+
+  wq_vars <- c('siteName',
+               'startDate',
+               'dissolvedOxygen',
+               'dissolvedOxygenExpUncert',
+               'dissolvedOxygenFinalQF',
+               'chlorophyll',
+               'chlorophyllExpUncert',
+               'chlorophyllFinalQF')
+  columns_keep <- c('siteName', 'termName', 'startDate', 'Value', 'verticalIndex')
+  
+  wq_avro <- wq_avro |> 
+    dplyr::filter(termName %in% wq_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
-    filter(horizontalIndex %in% c('101', '103')) %>%
-    select(siteName, termName, startDate, 
+  dplyr::filter(horizontalIndex %in% c('101', '103')) %>%
+  dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue) %>%
     # combine the value fields to one
-    mutate(Value = ifelse(is.na(doubleValue), 
+    dplyr::mutate(Value = ifelse(is.na(doubleValue), 
                           intValue, doubleValue)) %>%
-    select(any_of(columns_keep))
-  
+    dplyr::select(any_of(columns_keep))
+
   wq_tibble <- wq_avro %>%
     as.data.frame() %>%
     suppressWarnings()
@@ -76,7 +89,7 @@ read.avro.wq <- function(sc, name = 'name', path) {
       arrange(startDate, termName) %>%
       pivot_wider(names_from = termName, values_from = Value)  %>%
       filter_at(vars(ends_with('QF')), any_vars(. != 1)) # checks to see if any of the QF cols have a 1
-    
+
     # if the filtering has left rows then find the mean
     if (nrow(wq_tibble_wider) >= 1) {
       daily_wq <- wq_tibble_wider  %>%
@@ -99,13 +112,12 @@ read.avro.wq <- function(sc, name = 'name', path) {
                      names_to = c("variable", "stat"), 
                      names_sep = '__') %>%
         pivot_wider(names_from = stat, values_from = value)
-      
     } 
   }
   
   if (exists('daily_wq')) {
     if (unique(daily_wq$site_id) %in% stream_sites) {
-      daily_wq <- daily_wq %>% filter(variable == "oxygen")
+      daily_wq <- daily_wq %>% dplyr::filter(variable == "oxygen")
     }
   }
   
@@ -125,7 +137,7 @@ read.avro.wq <- function(sc, name = 'name', path) {
                observed = as.numeric(observed),
                sample_error = as.numeric(sample_error),
                measure_error = as.numeric(measure_error)) %>%
-        filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
+        dplyr::filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
       return(empty)
   }
 }
@@ -133,18 +145,23 @@ read.avro.wq <- function(sc, name = 'name', path) {
 read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
   message(paste0('reading file ', path))
   tsd_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
-                                         path = path) %>%
-    filter(termName %in% tsd_vars) %>%
+                                         path = path,
+                                         memory = FALSE,
+                                         overwrite = TRUE) |> 
+    collect()
+  
+  tsd_avro <- tsd_avro |> 
+    dplyr::filter(termName %in% tsd_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
-    filter(horizontalIndex %in% c('101', '103'), 
+    dplyr::filter(horizontalIndex %in% c('101', '103'), 
            temporalIndex == 030) %>% # take the 30-minutely data only
-    select(siteName, termName, startDate, 
+    dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue, verticalIndex) %>%
     # combine the value fields to one
-    mutate(Value = ifelse(is.na(doubleValue), 
+    dplyr::mutate(Value = ifelse(is.na(doubleValue), 
                           intValue, doubleValue)) %>%
-    select(any_of(columns_keep)) 
+    dplyr::select(any_of(columns_keep)) 
   
   
   tsd_tibble <- tsd_avro %>%
@@ -152,7 +169,7 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
     suppressWarnings() %>%
     inner_join(., thermistor_depths, by = c('siteName', 'verticalIndex')) %>%
     # only want temperatures in the surface (< 1 m) of the water column
-    filter(thermistorDepth <= 1.0) 
+    dplyr::filter(thermistorDepth <= 1.0) 
   
   if (nrow(tsd_tibble) >=1) {
     tsd_tibble_wider <- tsd_tibble %>%
@@ -202,7 +219,7 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
              observed = as.numeric(observed),
              sample_error = as.numeric(sample_error),
              measure_error = as.numeric(measure_error)) %>%
-      filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
+      dplyr::filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
   }
 }
@@ -211,18 +228,23 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
 read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
   message(paste0('reading file ', path))
   tsd_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
-                                         path = path) %>%
-    filter(termName %in% tsd_vars) %>%
+                                         path = path,
+                                         memory = FALSE,
+                                         overwrite = TRUE) %>%
+    collect()
+  
+  tsd_avro <- tsd_avro |> 
+    dplyr::filter(termName %in% tsd_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
-    filter(horizontalIndex %in% c('101', '103'), 
+    dplyr::filter(horizontalIndex %in% c('101', '103'), 
            temporalIndex == 030) %>% # take the 30-minutely data only
-    select(siteName, termName, startDate, 
+    dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue, verticalIndex) %>%
     # combine the value fields to one
-    mutate(Value = ifelse(is.na(doubleValue), 
+    dplyr::mutate(Value = ifelse(is.na(doubleValue), 
                           intValue, doubleValue)) %>%
-    select(any_of(columns_keep)) 
+    dplyr::select(any_of(columns_keep)) 
   
   
   tsd_tibble <- tsd_avro %>%
@@ -281,7 +303,7 @@ read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
              observed = as.numeric(observed),
              sample_error = as.numeric(sample_error),
              measure_error = as.numeric(measure_error)) %>%
-      filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
+      dplyr::filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
   }
 }
@@ -290,18 +312,23 @@ read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
 read.avro.prt <- function(sc, name = 'name', path) {
   message(paste0('reading file ', path))
   prt_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
-                                         path = path) %>%
-    filter(termName %in% prt_vars) %>%
+                                         path = path,
+                                         memory = FALSE,
+                                         overwrite = TRUE) %>%
+    collect()
+  
+  prt_avro <- prt_avro
+    dplyr::filter(termName %in% prt_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
-    filter(horizontalIndex %in% c('101', '103'), 
+      dplyr::filter(horizontalIndex %in% c('101', '103'), 
            temporalIndex == 030) %>% # take the 30-minutely data only
-    select(siteName, termName, startDate, 
+      dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue) %>%
     # combine the value fields to one
-    mutate(Value = ifelse(is.na(doubleValue), 
+      dplyr::mutate(Value = ifelse(is.na(doubleValue), 
                           intValue, doubleValue)) %>%
-    select(any_of(columns_keep)) 
+      dplyr::select(any_of(columns_keep)) 
   
   
   prt_tibble <- prt_avro %>%
@@ -351,7 +378,7 @@ read.avro.prt <- function(sc, name = 'name', path) {
              observed = as.numeric(observed),
              sample_error = as.numeric(sample_error),
              measure_error = as.numeric(measure_error)) %>%
-      filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
+      dplyr::filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
   }
 }
