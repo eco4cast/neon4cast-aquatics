@@ -7,7 +7,7 @@ QC.temp <- function(df, range, spike, by.depth = T) {
     df_QC <- df %>%
       arrange(site_id, time) %>%
       group_by(site_id) %>%
-      mutate(temp_change = observed - lag(observed), 
+      mutate(temp_change = observed - dplyr::lag(observed), 
              
              flagged_abs_val = ifelse(between(observed, min(range), max(range)), F, T),
              flagged_spike = ifelse(abs(temp_change) > spike,
@@ -19,15 +19,13 @@ QC.temp <- function(df, range, spike, by.depth = T) {
                                    flagged_flat != F,
                                  T, F),
              observed = ifelse(final_flag == T, 
-                                  NA, observed),
-             sample_error = ifelse(final_flag == T,
-                                   NA, sample_error)) %>%
+                                  NA, observed)) %>%
       select(-c(contains('flag'), temp_change))
   } else {
     df_QC <- df %>%
       arrange(site_id, time) %>%
       group_by(site_id, depth) %>%
-      mutate(temp_change = observed - lag(observed), 
+      mutate(temp_change = observed - dplyr::lag(observed), 
              
              flagged_abs_val = ifelse(between(observed, min(range), max(range)), F, T),
              flagged_spike = ifelse(abs(temp_change) > spike,
@@ -39,9 +37,7 @@ QC.temp <- function(df, range, spike, by.depth = T) {
                                    flagged_flat == T),
                                  T, F),
              observed = ifelse((final_flag == F | is.na(final_flag)), 
-                                  observed, NA),
-             sample_error = ifelse((final_flag == F | is.na(final_flag)),
-                                   sample_error, NA)) %>%
+                                  observed, NA)) %>%
       select(-c(contains('flag'), temp_change))
   }
   return(df_QC)

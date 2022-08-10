@@ -54,8 +54,10 @@ delete.neon.avro <- function(months, sites, path) {
 # requires wq_vars - specify
 read.avro.wq <- function(sc, name = 'name', path) {
   message(paste0('reading file ', path))
-  wq_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
-                                        path = path) |> 
+  wq_avro <- sparkavro::spark_read_avro(sc, 
+                                        name = "name",
+                                        path = path,
+                                        memory = FALSE) |> 
     dplyr::filter(termName %in% wq_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
@@ -86,20 +88,13 @@ read.avro.wq <- function(sc, name = 'name', path) {
                chlorophyll = ifelse('chlorophyll' %in% colnames(wq_tibble_wider), chlorophyll, NA),
                chlorophyllExpUncert = ifelse('chlorophyll' %in% colnames(wq_tibble_wider),chlorophyllExpUncert,NA)) %>%
         group_by(siteName, time) %>%
-        summarize(oxygen__observed = mean(dissolvedOxygen, na.rm = TRUE),
-                  chla__observed = mean(chlorophyll, na.rm = TRUE),
-                  oxygen__sample_error = se(dissolvedOxygen),
-                  chla__sample_error = se(chlorophyll),
-                  count = sum(!is.na(dissolvedOxygen)),
-                  chla__measure_error = mean(chlorophyllExpUncert, na.rm = TRUE) / sqrt(count),
-                  oxygen__measure_error = mean(dissolvedOxygenExpUncert, na.rm = TRUE) / sqrt(count),.groups = "drop") %>%
+        summarize(oxygen = mean(dissolvedOxygen, na.rm = TRUE),
+                  chla = mean(chlorophyll, na.rm = TRUE),.groups = "drop") %>%
         rename(site_id = siteName) %>%
-        select(-count) %>%
         # get in the same long format as the NEON portal data
-        pivot_longer(cols = !c(time, site_id), 
-                     names_to = c("variable", "stat"), 
-                     names_sep = '__') %>%
-        pivot_wider(names_from = stat, values_from = value)
+        pivot_longer(cols = -c("time", "site_id"), 
+                     names_to = "variable", 
+                     values_to = "observed")
     } 
   }
   
@@ -116,15 +111,11 @@ read.avro.wq <- function(sc, name = 'name', path) {
       empty <- data.frame(site_id = NA, 
                           time = NA, 
                           variable = NA,
-                          observed = NA, 
-                          sample_error = NA,
-                          measure_error = NA)  %>%
+                          observed = NA)  %>%
         mutate(site_id = as.character(site_id),
                time = as.Date(time),
                variable = as.character(variable),
-               observed = as.numeric(observed),
-               sample_error = as.numeric(sample_error),
-               measure_error = as.numeric(measure_error)) %>%
+               observed = as.numeric(observed)) %>%
         dplyr::filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
       return(empty)
   }
@@ -132,8 +123,10 @@ read.avro.wq <- function(sc, name = 'name', path) {
 
 read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
   message(paste0('reading file ', path))
-  tsd_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
-                                         path = path) |> 
+  tsd_avro <- sparkavro::spark_read_avro(sc, 
+                                         name = "name",
+                                         path = path,
+                                         memory = FALSE) |> 
     dplyr::filter(termName %in% tsd_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
@@ -171,18 +164,13 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
         # tsdWaterTempExpUncert = ifelse('tsdWaterTempExpUncert' %in% colnames(tsd_tibble_wider),
         #                                tsdWaterTempExpUncert, NA)) %>%
         group_by(siteName, time) %>%
-        summarize(temperature__observed = mean(tsdWaterTempMean, na.rm = TRUE),
-                  count = sum(!is.na(tsdWaterTempMean)),
-                  temperature__measure_error = mean(tsdWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
-                  temperature__sample_error = se(tsdWaterTempMean),
+        summarize(temperature = mean(tsdWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
-        select(-count) %>%
         # get in the same long format as the NEON portal data
-        pivot_longer(cols = !c(time, site_id), 
-                     names_to = c("variable", "stat"), 
-                     names_sep = '__') %>%
-        pivot_wider(names_from = stat, values_from = value)
+        pivot_longer(cols = -c("time", "site_id"), 
+                     names_to = "variable", 
+                     values_to = "observed")
       
     } 
   }
@@ -194,15 +182,11 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
     empty <- data.frame(site_id = NA,
                         time = NA, 
                         variable = NA, 
-                        observed = NA, 
-                        sample_error = NA,
-                        measure_error = NA)  %>%
+                        observed = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
-             observed = as.numeric(observed),
-             sample_error = as.numeric(sample_error),
-             measure_error = as.numeric(measure_error)) %>%
+             observed = as.numeric(observed)) %>%
       dplyr::filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
   }
@@ -212,8 +196,10 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
 read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
   message(paste0('reading file ', path))
 
-    tsd_avro <- sparkavro::spark_read_avro(sc, name = 'name', 
-                                           path = path) %>%
+    tsd_avro <- sparkavro::spark_read_avro(sc, 
+                                           name = "name",
+                                           path = path,
+                                           memory = FALSE) %>%
     dplyr::filter(termName %in% tsd_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
@@ -249,19 +235,14 @@ read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
         # tsdWaterTempExpUncert = ifelse('tsdWaterTempExpUncert' %in% colnames(tsd_tibble_wider),
         #                                tsdWaterTempExpUncert, NA)) %>%
         group_by(siteName, time, thermistorDepth) %>%
-        summarize(temperature__observed = mean(tsdWaterTempMean, na.rm = TRUE),
-                  count = sum(!is.na(tsdWaterTempMean)),
-                  temperature__measure_error = mean(tsdWaterTempExpUncert) / sqrt(count),
-                  temperature__sample_error = se(tsdWaterTempMean),
+        summarize(temperature = mean(tsdWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName,
                depth = thermistorDepth) %>%
-        select(-count) %>%
         # get in the same long format as the NEON portal data
-        pivot_longer(cols = !c(time, site_id, depth), 
-                     names_to = c("variable", "stat"), 
-                     names_sep = '__') %>%
-        pivot_wider(names_from = stat, values_from = value)
+        pivot_longer(cols = -c("time", "site_id", "depth"), 
+                     names_to = "variable", 
+                     values_to = "observed")
       
     } 
   }
@@ -274,16 +255,12 @@ read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
                         time = NA, 
                         depth = NA,
                         variable = NA, 
-                        observed = NA, 
-                        sample_error = NA,
-                        measure_error = NA)  %>%
+                        observed = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              depth = as.numeric(depth),
              variable = as.character(variable),
-             observed = as.numeric(observed),
-             sample_error = as.numeric(sample_error),
-             measure_error = as.numeric(measure_error)) %>%
+             observed = as.numeric(observed)) %>%
       dplyr::filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
   }
@@ -323,18 +300,11 @@ read.avro.prt <- function(sc, name = 'name', path) {
       daily_prt <- prt_tibble_wider  %>%
         mutate(time = as.Date(startDate)) %>%
         group_by(siteName, time) %>%
-        summarize(temperature__observed = mean(surfWaterTempMean, na.rm = TRUE),
-                  count = sum(!is.na(surfWaterTempMean)),
-                  temperature__measure_error = mean(surfWaterTempExpUncert, na.rm = TRUE) / sqrt(count),
-                  temperature__sample_error = se(surfWaterTempMean),
+        summarize(temperature = mean(surfWaterTempMean, na.rm = TRUE),
                   .groups = "drop") %>%
         rename(site_id = siteName) %>%
-        select(-count) %>%
-        # get in the same long format as the NEON portal data
-        pivot_longer(cols = !c(time, site_id), 
-                     names_to = c("variable", "stat"), 
-                     names_sep = '__')%>%
-        pivot_wider(names_from = stat, values_from = value)
+        rename(observation = temperature) |> 
+        mutate(variable = "temperature")
       
     } 
   }
@@ -346,15 +316,11 @@ read.avro.prt <- function(sc, name = 'name', path) {
     empty <- data.frame(site_id = NA, 
                         time = NA, 
                         variable = NA, 
-                        observed = NA, 
-                        sample_error = NA,
-                        measure_error = NA)  %>%
+                        observed = NA)  %>%
       mutate(site_id = as.character(site_id),
              time = as.Date(time),
              variable = as.character(variable),
-             observed = as.numeric(observed),
-             sample_error = as.numeric(sample_error),
-             measure_error = as.numeric(measure_error)) %>%
+             observed = as.numeric(observed)) %>%
       dplyr::filter(rowSums(is.na(.)) != ncol(.)) # remove the empty row
     return(empty)
   }
