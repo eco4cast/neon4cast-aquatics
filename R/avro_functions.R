@@ -61,7 +61,7 @@ read.avro.wq <- function(sc, name = 'name', path) {
     dplyr::filter(termName %in% wq_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
-  dplyr::filter(horizontalIndex %in% c('101', '103')) %>%
+  dplyr::filter(horizontalIndex %in% c('101', '111', '103')) %>%
   dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue) %>%
     dplyr::collect() |> 
@@ -130,7 +130,7 @@ read.avro.tsd <- function(sc, name = 'name', path, thermistor_depths) {
     dplyr::filter(termName %in% tsd_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
-    dplyr::filter(horizontalIndex %in% c('101', '103'), 
+    dplyr::filter(horizontalIndex %in% c('101','111', '103'), 
            temporalIndex == "030") %>% # take the 30-minutely data only
     dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue, verticalIndex) %>%
@@ -203,7 +203,7 @@ read.avro.tsd.profile <- function(sc, name = 'name', path, thermistor_depths) {
     dplyr::filter(termName %in% tsd_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
-    dplyr::filter(horizontalIndex %in% c('101', '103'), 
+    dplyr::filter(horizontalIndex %in% c('101', '111' '103'), 
            temporalIndex == "030") %>% # take the 30-minutely data only
     dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue, verticalIndex) %>%
@@ -274,7 +274,7 @@ read.avro.prt <- function(sc, name = 'name', path) {
     dplyr::filter(termName %in% prt_vars) %>%
     # for streams want to omit the downstream measurement (102) and retain upstream (101)
     # rivers and lakes horizontal index is 103
-      dplyr::filter(horizontalIndex %in% c('101', '103'), 
+      dplyr::filter(horizontalIndex %in% c('101', '111', '103'), 
            temporalIndex == "030") %>% # take the 30-minutely data only
       dplyr::select(siteName, termName, startDate, 
            doubleValue, intValue) %>%

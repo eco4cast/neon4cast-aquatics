@@ -436,10 +436,9 @@ daily_temp_surface_lakes <- hourly_temp_profile_lakes %>%
 message("##### Stream temperatures #####")
 temp_streams_portal <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.001")) %>% 
 #temp_streams_portal <- neonstore::neon_table("TSW_30min", site = sites$field_site_id) %>%
-  dplyr::filter(horizontalPosition == "101", # take upstream to match WQ data
+  dplyr::filter(horizontalPosition == "101" | horizontalPosition == "111", # take upstream to match WQ data
                 finalQF == 0) %>%  
   dplyr::select(startDateTime, siteID, surfWaterTempMean, surfWaterTempExpUncert, finalQF) %>%
-  # horizontal position is upstream or downstream is 101 or 102 horizontal position
   dplyr::collect() %>%
   dplyr::rename(site_id = siteID) 
 
