@@ -118,7 +118,8 @@ new_month_wq <- unique(format(c((as.Date(max(wq_portal$time)) %m+% months(1)), (
 
 delete.neon.avro(months = cur_wq_month,
                  sites = unique(sites$field_site_id), 
-                 path = avro_file_directory)
+                 path = avro_file_directory,
+                 data_product = '20288')
 
 
 # Download any new files from the Google Cloud
@@ -350,7 +351,26 @@ hourly_temp_profile_EDI <- purrr::map_dfr(.x = edi_lake_files, ~ read.csv(file =
 
 message("##### avros data #####")
 message("# Download any new files from the Google Cloud")
-download.neon.avro(months = new_month_wq, 
+
+# need to figure out which month's data are required
+# what is in the NEON store db?
+cur_tsd_month <- format(as.Date(max(hourly_temp_profile_portal$time)), "%Y-%m")
+# what is the next month from this plus the current month? These might be the same
+new_month_tsd <- unique(format(c((as.Date(max(hourly_temp_profile_portal$time)) %m+% months(1)), (Sys.Date() - days(2))), "%Y-%m"))
+
+# Start by deleting superseded files
+# Files that have been supersed by the NEON store files can be deleted from the relevent repository
+# Look in each repository to see if there are files that match the current maximum month of the NEON
+# store data
+
+delete.neon.avro(months = cur_tsd_month,
+                 sites = unique(sites$field_site_id), 
+                 path = avro_file_directory,
+                 data_product = '20264')
+
+
+# Download any new files from the Google Cloud
+download.neon.avro(months = new_month_tsd, 
                    sites = unique(sites$field_site_id), 
                    data_product = '20264',  # TSD data product
                    path = avro_file_directory)
@@ -423,7 +443,6 @@ temp_streams_portal <- arrow::open_dataset(neon$path("TSW_30min-basic-DP1.20053.
   dplyr::collect() %>%
   dplyr::rename(site_id = siteID) 
 
-message("##### Stream temperatures2 #####")
 temp_streams_portal <- temp_streams_portal %>%
   dplyr::mutate(time = as_date(startDateTime)) %>% 
   dplyr::group_by(time, site_id) %>%
@@ -435,22 +454,30 @@ temp_streams_portal <- temp_streams_portal %>%
 temp_streams_portal_QC <- temp_streams_portal %>%
   QC.temp(range = c(-5, 40), spike = 7, by.depth = F)
 #===========================================#
-message("##### Stream temperatures3 #####") 
+message("##### Stream temperatures2 #####") 
     #### avros
 
+# need to figure out which month's data are required
+# what is in the NEON store db?
+cur_prt_month <- format(as.Date(max(temp_streams_portal_QC$time)), "%Y-%m")
+# what is the next month from this plus the current month? These might be the same
+new_month_prt <- unique(format(c((as.Date(max(temp_streams_portal_QC$time)) %m+% months(1)), (Sys.Date() - days(2))), "%Y-%m"))
+
 # Start by deleting superseded files
-# Files that have been superseded by the NEON store files can be deleted from the relevant repository
+# Files that have been supersed by the NEON store files can be deleted from the relevent repository
 # Look in each repository to see if there are files that match the current maximum month of the NEON
 # store data
 
-delete.neon.avro(months = cur_wq_month,
-                 sites = unique(sites$field_site_id),
-                 path = avro_file_directory)
+delete.neon.avro(months = cur_prt_month,
+                 sites = unique(sites$field_site_id), 
+                 path = avro_file_directory,
+                 data_product = '20053')
+
 
 # Download any new files from the Google Cloud
-download.neon.avro(months = new_month_wq, 
+download.neon.avro(months = new_month_prt, 
                    sites = unique(sites$field_site_id), 
-                   data_product = '20053',  # WQ data product
+                   data_product = '20053',  # PRT data product
                    path = avro_file_directory)
 
 # Read in the new files to append to the NEONstore data
