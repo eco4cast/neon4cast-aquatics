@@ -67,7 +67,7 @@ if(curr_month < 10){
 curr_year <- year(Sys.Date())
 start_date <- Sys.Date() + days(1)
 
-forecast_dates <- seq(start_date, as_date(start_date + days(35)), "1 day")
+forecast_dates <- seq(start_date, as_date(start_date + days(34)), "1 day")
 forecast_doy <- yday(forecast_dates)
 
 
@@ -111,8 +111,9 @@ combined <- forecast %>%
   mutate(mean = imputeTS::na_interpolation(mean),
          sd = median(sd, na.rm = TRUE)) %>%
   pivot_longer(c("mean", "sd"),names_to = "parameter", values_to = "predicted") |> 
-  mutate(family = "norm") |> 
-  select(time, site_id, variable, family, parameter, predicted)
+  mutate(family = "normal") |> 
+  mutuate(start_time = lubridate::as_date(min(time)) - lubridate::days(1)) |> 
+  select(time, start_time, site_id, variable, family, parameter, predicted)
 
 combined |> 
   filter(parameter == "mean") |> 

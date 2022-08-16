@@ -18,6 +18,7 @@ download.file("https://data.ecoforecast.org/neon4cast-targets/aquatics/aquatics-
 phenoDat <- read_csv("aquatics-targets.csv.gz")
 sites <- unique(as.character(phenoDat$site_id))
 target_variables <- c("temperature","oxygen", "chla")
+observation_error <- c(0.01, 0.01, 0.01)
 
 forecast_length <- 35
 predictions <- array(NA, dim = c(length(target_variables), forecast_length, length(sites), 2000))
@@ -73,7 +74,7 @@ for(i in 1:length(target_variables)){
       
       d <- tibble::tibble(time = sitePhenoDat_variable$time,
                           p=as.numeric(sitePhenoDat_variable$observed),
-                          p.sd=as.numeric(sitePhenoDat_variable$measure_error))
+                          p.sd= observation_error[i])
       d <- dplyr::full_join(d, full_time)
       
       ggplot(d, aes(x = time, y = p)) +
@@ -169,8 +170,10 @@ for(i in 1:length(target_variables)){
 forecast_file_name <- paste0("aquatics-",lubridate::as_date(min(forecast_saved$time)),"-",team_name,".csv.gz")
 
 
+
 forecast_saved <- forecast_saved |> 
-  select(time, site_id, variable, ensemble, predicted)
+  mutuate(start_time = lubridate::as_date(min(time)) - lubridate::days(1))
+  select(time, start_time, site_id, variable, ensemble, predicted)
 
 write_csv(forecast_saved, forecast_file_name)
 
