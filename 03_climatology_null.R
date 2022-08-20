@@ -39,11 +39,12 @@ team_name <- "climatology"
 
 #'Read in target file.  The guess_max is specified because there could be a lot of
 #'NA values at the beginning of the file
-targets <- read_csv("https://data.ecoforecast.org/neon4cast-targets/aquatics/aquatics-targets.csv.gz", guess_max = 10000)
+targets <- readr::read_csv("https://data.ecoforecast.org/neon4cast-targets/aquatics/aquatics-targets.csv.gz", guess_max = 10000)
 #targets <- read_csv("aquatics-targets.csv.gz")
 
 
-sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-aquatics/master/Aquatic_NEON_Field_Site_Metadata_20210928.csv")
+sites <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv") |> 
+  dplyr::filter(aquatics == 1)
 
 site_names <- sites$field_site_id
 
@@ -108,15 +109,15 @@ forecast |>
 combined <- forecast %>% 
   select(time, site_id, variable, mean, sd) %>% 
   group_by(site_id, variable) %>% 
-  mutate(mean = imputeTS::na_interpolation(mean),
-         sd = median(sd, na.rm = TRUE)) %>%
-  pivot_longer(c("mean", "sd"),names_to = "parameter", values_to = "predicted") |> 
+  mutate(mu = imputeTS::na_interpolation(mean),
+         sigma = median(sd, na.rm = TRUE)) %>%
+  pivot_longer(c("mu", "sigma"),names_to = "parameter", values_to = "predicted") |> 
   mutate(family = "normal") |> 
-  mutuate(start_time = lubridate::as_date(min(time)) - lubridate::days(1)) |> 
+  mutate(start_time = lubridate::as_date(min(time)) - lubridate::days(1)) |> 
   select(time, start_time, site_id, variable, family, parameter, predicted)
 
 combined |> 
-  filter(parameter == "mean") |> 
+  filter(parameter == "mu") |> 
   ggplot(aes(x = time, y = predicted)) +
   geom_point() +
   facet_grid(site_id ~ variable, scale = "free")
@@ -127,19 +128,20 @@ combined %>%
   select(time, predicted ,parameter, variable, site_id) %>% 
   pivot_wider(names_from = parameter, values_from = predicted) %>% 
   ggplot(aes(x = time)) +
-  geom_ribbon(aes(ymin=mean - sd*1.96, ymax=mean + sd*1.96), alpha = 0.1) + 
-  geom_line(aes(y = mean)) +
+  geom_ribbon(aes(ymin=mu - sigma*1.96, ymax=mu + sigma*1.96), alpha = 0.1) + 
+  geom_line(aes(y = mu)) +
   facet_grid(variable~site_id, scales = "free") +
   theme_bw()
-ggsave("clim.png", width = 10, height = 10)
 
 forecast_file <- paste("aquatics", min(combined$time), "climatology.csv.gz", sep = "-")
 
 write_csv(combined, forecast_file)
 
-# neon4cast::submit(forecast_file = forecast_file, 
-#                   metadata = NULL, 
-#                   ask = FALSE)
+neon4cast::submit(forecast_file = forecast_file, 
+                   metadata = NULL, 
+                   ask = FALSE)
+
+unlink(forecast_file)
 
 
 
